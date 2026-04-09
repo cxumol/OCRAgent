@@ -1,0 +1,5 @@
+- ToolName: pdftxt
+- Brief: http api endpoint that wraps `chr(12).join([page.get_text() for page in pymupdf.open(fname)])`.
+- Scope: PDF XPS EPUB MOBI FB2 CBZ
+
+Example

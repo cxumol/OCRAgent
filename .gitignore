@@ -13,3 +13,7 @@ wheels/
 
 # AI
 .ai/
+
+# user
+
+pennyparse.settings.ini
