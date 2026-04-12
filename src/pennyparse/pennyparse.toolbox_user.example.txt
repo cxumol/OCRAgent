@@ -19,7 +19,7 @@ curl -X POST https://paddlepaddle-paddleocr-vl-1-5-online-demo.hf.space/gradio_a
 
 ---
 
-- ToolName: modelscope_
+- ToolName: mineru
 - Scope: parser
 - Cost: medium
 - API:
@@ -94,3 +94,31 @@ curl  'https://api.siliconflow.cn/v1/chat/completions' \
     }'
 ```
 - Params: --image_url DATA_URL --prompt_text PROMPT
+
+
+---
+
+- ToolName: openrouter_gemma4
+- Scope: parser
+- Cost: high
+- API:
+```python
+import requests
+
+url = "https://openrouter.ai/api/v1/chat/completions"
+headers = {
+    "Authorization": "Bearer OPENROUTER_API_KEY",
+    "Content-Type": "application/json"
+}
+data = {
+    "model": "google/gemma-4-31b-it:free",
+    "messages":[{"role": "user","content": [
+            {"type": "text","text": "What's in this image?"},
+            {"type": "image_url","image_url": {"url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/dd/Gfp-wisconsin-madison-the-nature-boardwalk.jpg/2560px-Gfp-wisconsin-madison-the-nature-boardwalk.jpg"}
+            }
+        ]}
+]}
+
+response = requests.post(url, headers=headers, json=data)
+print(response.json())
+```
