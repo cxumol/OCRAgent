@@ -13,3 +13,9 @@ def extract_md_codeblock(s: str) -> str:
     Extract content of the last fenced code block from markdown.
     """
     return _extract_between(s, r"```\S*\n", r"```", get_last=True)
+
+def extract_pesudo_xml(s: str, tag: str) -> str:
+    """
+    Extract content inside pseudo-xml tag from text.
+    """
+    return _extract_between(s, f"<{tag}.*?>", f"</{tag}>", get_last=True)

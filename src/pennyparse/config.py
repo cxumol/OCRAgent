@@ -3,6 +3,7 @@ import importlib.resources
 import os
 import re
 import tomllib
+import string
 from pathlib import Path
 from typing import Mapping, TypedDict
 
@@ -94,7 +95,4 @@ def get_chat_settings() -> ChatSettings:
 
 
 def inject_prompt_context(template: str, context: Mapping[str, str]) -> str:
-    rendered = template
-    for key, value in context.items():
-        rendered = rendered.replace(f"${{{key}}}", value)
-    return rendered
+    return string.Template(template).safe_substitute(context)
