@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 from copy import deepcopy
 from dataclasses import dataclass, field
 from typing import Any, Iterator, Mapping, Sequence
@@ -27,6 +28,14 @@ def response_message(response: Mapping[str, Any], *, choice: int = 0) -> Message
     if len(choices) <= choice:
         raise ValueError("chat completion returned no choices")
     return _clone_message(choices[choice]["message"])
+
+
+def simple_chatcomp(user:str,api:api,system:str="")->str:
+    chat = ChatSession()
+    chat.system(system)
+    chat.user(user)
+    response = api.chat(chat)
+    return response_message(response)["content"]
 
 
 @dataclass(slots=True)
@@ -232,9 +241,9 @@ class ChatClient:
             return
 
         merged_headers = {"accept": "application/json"}
-        token = api_key or os.getenv("OPENAI_API_KEY")
-        if token:
-            merged_headers["authorization"] = f"Bearer {token}"
+        sk = api_key or os.getenv("OPENAI_API_KEY")
+        if sk:
+            merged_headers["authorization"] = f"Bearer {sk}"
         if headers:
             merged_headers.update(headers)
 

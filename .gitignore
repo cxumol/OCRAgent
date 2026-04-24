@@ -20,3 +20,4 @@ wheels/
 .env
 pennyparse.settings.ini
 pennyparse.toolbox_user.txt
+*.log
