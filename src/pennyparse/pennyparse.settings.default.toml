@@ -17,6 +17,7 @@ folder = [".git", "__pycache__", "pennyparse_output", "pennyparse_results"]
 by = "random"  # first, random, none
 num = 3        # >=0
 pdf_page = 3   # >=0
+pdf_page_total_max = 20   # >=0
 
 [orchestrator.decision.threshold]
 by = "LLM"           # majority, LLM, LLM_proofread
