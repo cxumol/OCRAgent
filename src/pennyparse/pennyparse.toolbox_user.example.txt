@@ -1,12 +1,17 @@
-This note defines three user tools for PennyParse: `siliconflow_deepseekocr`, `openrouter_gemma4`, and `mineru`.
+siliconflow_deepseekocr
 
-These tools are generated Python code. They may call third-party services or local binaries. Review correctness, security, cost, compliance, and every secret before use.
+DeepSeek-OCR 支持多种场景的提示词(要求固定格式)：
 
-The `siliconflow_deepseekocr` tool is a user-defined parser with medium cost. It returns plain text. It requires the `SILICONFLOW_API_KEY` environment variable.
+- 文档转Markdown：<image>\n<|grounding|>Convert the document to markdown.
+- 通用OCR：<image>\n<|grounding|>OCR this image.
+- 无布局提取：<image>\nFree OCR.
+- 图表解析：<image>\nParse the figure.
+- 图像描述：<image>\nDescribe this image in detail.
+- 文本定位：<image>\nLocate <|ref|>特定文字<|/ref|> in the image.
 
-It accepts a required `path` parameter of type `path`. The path points to a local image or PDF. It also accepts an optional `prompt_text` parameter of type `string`. That parameter overrides the OCR prompt text, but exact upstream markers and special tokens must be preserved when the provider expects them.
+DeepSeek-OCR 还支持 PDF URL 或 base64 编码数据。
 
-API reference for `siliconflow_deepseekocr`:
+例如
 
 POST `https://api.siliconflow.cn/v1/chat/completions`
 Authorization: `Bearer $SILICONFLOW_API_KEY`
@@ -34,61 +39,115 @@ Example request body:
   ]
 }
 
-Implementation notes for `siliconflow_deepseekocr`:
+---
 
-The handler should accept local file input and adapt it into the provider request shape. Prefer `httpx`. For local files, construct one chat-completions request with a single user message whose content contains both the image payload and the text prompt. `image_url.url` accepts regular image URL or base64 input, and DeepSeek-OCR also accepts PDF URL or base64 input. The local-path implementation should therefore support both image data URIs such as `data:image/png;base64,...` and PDF data URIs such as `data:application/pdf;base64,...`.
+MinerU 轻量解析 API
 
-`prompt_text` is important request-shape data, not generic prose. Preserve exact prompt markers when needed by the upstream model. Representative prompts include:
-- `<image>\n<|grounding|>Convert the document to markdown.`
-- `<image>\n<|grounding|>OCR this image.`
-- `<image>\nFree OCR.`
-- `<image>\nParse the figure.`
-- `<image>\nDescribe this image in detail.`
-- `<image>\nLocate <|ref|>target text<|/ref|> in the image.`
+    免登录，无需 Token，IP 限频防滥用。专为 OpenClaw 等 AI Agent 场景设计，仅输出 Markdown，免登录零门槛。
 
-Return only the extracted text or markdown. Do not print the response body.
+概述
 
-The `openrouter_gemma4` tool is a user-defined parser with high cost. It returns plain text. It requires the `OPENROUTER_API_KEY` environment variable.
+Agent 轻量解析接口专为 OpenClaw 等 AI Agent 场景设计，提供快速、免登录的文档解析能力。
 
-It accepts a required `path` parameter of type `path`. The path points to a local image file. It also accepts an optional `prompt_text` parameter of type `string`.
+核心特性：
 
-API reference for `openrouter_gemma4`:
+    无需登录：通过 IP 限频防滥用，无需申请 Token
+    轻量快速：PDF、图片使用 pipeline 轻量模型，禁用表格/公式识别，追求最快解析速度; Word、PPT使用Office原生API解析
+    统一输出：仅输出 Markdown 格式，返回 CDN 链接
+    双模式提交：URL 解析和文件上传为独立接口，文件上传采用签名上传模式
 
-POST `https://openrouter.ai/api/v1/chat/completions`
-Authorization: `Bearer $OPENROUTER_API_KEY`
+文件限制：
+限制项	限制值
+文件大小上限	10 MB
+文件页数上限	20 页
+支持文件类型	PDF、图片（png/jpg/jpeg/jp2/webp/gif/bmp）、Docx、PPTx、Xls、Xlsx
 
-Implementation notes for `openrouter_gemma4`:
+IP 限频：
 
-Use a local image path, convert it into a data URL, and send one user message containing text and image parts. Return the model text only.
+    每 IP 每分钟提交请求数有限制
+    超出限制将返回 HTTP 429 状态码
+import requests
+import time
 
-The `mineru` tool is a user-defined parser with medium cost. It returns plain text.
+BASE_URL = "https://mineru.net/api/v1/agent"
 
-It accepts a required `path` parameter of type `path`. The path points to a local PDF file. It also accepts optional `language`, `page_range`, `enable_table`, `is_ocr`, and `enable_formula` parameters. `language` and `page_range` are strings. `enable_table`, `is_ocr`, and `enable_formula` are booleans.
+def parse_by_file(file_path, language="ch", page_range=None, enable_table=True, is_ocr=False, enable_formula=True):
+    """通过文件上传提交文档解析任务并等待结果。"""
+    file_name = file_path.split("/")[-1].split("\\")[-1]
 
-API reference for `mineru`:
+    # 1. 获取签名上传 URL
+    data = {"file_name": file_name, "language": language, "enable_table": enable_table, "is_ocr": is_ocr, "enable_formula": enable_formula}
+    if page_range:
+        data["page_range"] = page_range
 
-POST `https://mineru.net/api/v1/agent/parse/file`
-Content-Type: `application/json`
+    resp = requests.post(f"{BASE_URL}/parse/file", json=data)
+    result = resp.json()
+    if result["code"] != 0:
+        print(f"获取上传链接失败: {result['msg']}")
+        return None
 
-Example request body:
-{
-  "file_name": "document.pdf",
-  "language": "ch",
-  "page_range": "1-10",
-  "enable_table": true,
-  "is_ocr": false,
-  "enable_formula": true
-}
+    task_id = result["data"]["task_id"]
+    file_url = result["data"]["file_url"]
+    print(f"任务已创建, task_id: {task_id}")
 
-Then upload with:
-PUT `<file_url>`
-`<raw file bytes>`
+    # 2. PUT 上传文件到 OSS
+    with open(file_path, "rb") as f:
+        put_resp = requests.put(file_url, data=f)
+        if put_resp.status_code not in (200, 201):
+            print(f"文件上传失败, HTTP {put_resp.status_code}")
+            return None
+    print("文件上传成功，等待解析...")
 
-Then poll:
-GET `https://mineru.net/api/v1/agent/parse/{task_id}`
+    # 3. 轮询等待结果
+    return poll_result(task_id)
 
-Implementation notes for `mineru`:
 
-Follow the official signed-upload flow. Step 1: POST JSON to `/api/v1/agent/parse/file` with `file_name` and optional parse settings. The official local-file upload example says this endpoint does not require an Authorization header. Step 2: read `task_id` and signed `file_url` from the response, then upload the local PDF with HTTP PUT directly to `file_url`. Step 3: poll `GET /api/v1/agent/parse/{task_id}` until the task reaches `done` or `failed`. When `state=done`, fetch the returned `markdown_url` and return the markdown body, not just the URL. Handle documented task states such as `waiting-file`, `uploading`, `pending`, `running`, `done`, and `failed`.
+def poll_result(task_id, timeout=300, interval=3):
+    """轮询查询解析结果。"""
+    state_labels = {
+        "pending": "排队中",
+        "running": "解析中",
+        "waiting-file": "等待文件上传",
+    }
+    start = time.time()
+    while time.time() - start < timeout:
+        resp = requests.get(f"{BASE_URL}/parse/{task_id}")
+        result = resp.json()
+        state = result["data"]["state"]
+        elapsed = int(time.time() - start)
 
-If the remote API is unstable or cannot complete within a short smoke test, it is acceptable to mark the tool unavailable with a concrete reason.
+        if state == "done":
+            markdown_url = result["data"]["markdown_url"]
+            print(f"[{elapsed}s] 解析完成, Markdown 下载链接: {markdown_url}")
+            md_resp = requests.get(markdown_url)
+            return md_resp.text
+
+        if state == "failed":
+            print(f"[{elapsed}s] 解析失败: {result['data'].get('err_msg', '未知错误')}")
+            return None
+
+        print(f"[{elapsed}s] {state_labels.get(state, state)}...")
+        time.sleep(interval)
+
+    print(f"轮询超时 ({timeout}s)，请稍后手动查询 task_id: {task_id}")
+    return None
+
+
+# 使用示例
+content = parse_by_file("./document.pdf")
+
+---
+
+paddleOCR offical demo api
+
+curl -X POST https://paddlepaddle-paddleocr-vl-1-5-online-demo.hf.space/gradio_api/call/parse_doc -s -H "Content-Type: application/json" -d '{
+	"data": [
+			{"path":"https://github.com/gradio-app/gradio/raw/main/test/test_files/sample_file.pdf","meta":{"_type":"gradio.FileData"}},
+			true,
+			true,
+			true
+	]}' \
+	| awk -F'"' '{ print $4}'  \
+	| read EVENT_ID; curl -N https://paddlepaddle-paddleocr-vl-1-5-online-demo.hf.space/gradio_api/call/parse_doc/$EVENT_ID
+
+File inputs: POST https://paddlepaddle-paddleocr-vl-1-5-online-demo.hf.space/gradio_api/upload -F "files=@file.ext", use as: {"path": "<returned-path>", "meta": {"_type": "gradio.FileData"}, "orig_name": "file.ext"}

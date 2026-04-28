@@ -36,6 +36,8 @@ Or override with env vars:
 - `PENNYPARSE_CHAT_AUTHKEY` (or `OPENAI_API_KEY`)
 - `PENNYPARSE_CHAT_MODEL`
 
+If no `PENNYPARSE_CHAT_*` variable is present, the CLI prints a warning because these values must be configured by the user for normal LLM-backed operation.
+
 `pennyparse init tools` and `pennyparse init docs` require `aigc.api.chatcomp.model` to be non-empty (or set `PENNYPARSE_CHAT_MODEL`).
 
 ## Web Settings

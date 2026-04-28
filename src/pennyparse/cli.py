@@ -10,7 +10,14 @@ from typing import Any
 import typer
 from typing_extensions import Annotated
 
-from .config import PENNYPARSE_HOST, PENNYPARSE_PORT, get_user_toolbox_path, pp_config
+from .config import (
+    PENNYPARSE_CHAT_ENV_REMINDER,
+    PENNYPARSE_HOST,
+    PENNYPARSE_PORT,
+    get_user_toolbox_path,
+    has_pennyparse_chat_env,
+    pp_config,
+)
 from .logger import configure_logging, get_logger
 
 app = typer.Typer(name="pennyparse", help="PennyParse CLI", no_args_is_help=True)
@@ -31,6 +38,7 @@ _TOOL_COMMAND_HELP = (
     "  pennyparse tool <toolname> [args...]\n"
     "  pennyparse tool <toolname> --help\n"
 )
+_CHAT_ENV_REMINDER_SHOWN = False
 
 
 def resolve_entrypoint(entrypoint: str) -> Any:
@@ -56,6 +64,14 @@ def _write_result(kind: str, value: Any) -> None:
     text = str(value)
     sys.stdout.write(text)
     sys.stdout.flush()
+
+
+def _warn_missing_chat_env(logger) -> None:
+    global _CHAT_ENV_REMINDER_SHOWN
+    if _CHAT_ENV_REMINDER_SHOWN or has_pennyparse_chat_env():
+        return
+    logger.warning(PENNYPARSE_CHAT_ENV_REMINDER)
+    _CHAT_ENV_REMINDER_SHOWN = True
 
 
 def _readline_with_timeout(prompt: str, *, timeout_s: int) -> str | None:
@@ -110,6 +126,7 @@ def init_tools(
     """Generate ~/.pennyparse/user_toolbox.py from a toolbox TXT file."""
     configure_logging()
     logger = get_logger("cli")
+    _warn_missing_chat_env(logger)
     target_path = get_user_toolbox_path()
     overwrite = force or (not target_path.exists()) or _confirm_overwrite(target_path)
     if target_path.exists() and not overwrite:
@@ -139,6 +156,7 @@ def init_docs(
     """Initialize ./.pennyparse_memory.txt for the current docs directory."""
     configure_logging()
     logger = get_logger("cli")
+    _warn_missing_chat_env(logger)
     target_path = Path.cwd() / ".pennyparse_memory.txt"
     overwrite = force or (not target_path.exists()) or _confirm_overwrite(target_path)
     if target_path.exists() and not overwrite:
@@ -169,6 +187,7 @@ def tool_command(
     """List tools or execute a specific tool."""
     configure_logging()
     logger = get_logger("cli")
+    _warn_missing_chat_env(logger)
     extra_args = list(ctx.args)
     list_tools = resolve_entrypoint(_LIST_TOOLS_ENTRYPOINT)
 
@@ -205,6 +224,7 @@ def serve(
 ):
     """Start the minimal web shell."""
     configure_logging()
+    _warn_missing_chat_env(get_logger("cli"))
     resolve_entrypoint(_WEB_SERVE_ENTRYPOINT)(host=PENNYPARSE_HOST, port=port)
 
 

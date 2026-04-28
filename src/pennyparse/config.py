@@ -6,6 +6,15 @@ from pathlib import Path
 from typing import Any, Mapping, TypedDict
 
 _DEFAULT_SETTINGS_TOML = "pennyparse.settings.default.toml"
+PENNYPARSE_CHAT_ENV_NAMES = (
+    "PENNYPARSE_CHAT_BASE",
+    "PENNYPARSE_CHAT_AUTHKEY",
+    "PENNYPARSE_CHAT_MODEL",
+)
+PENNYPARSE_CHAT_ENV_REMINDER = (
+    "PENNYPARSE_CHAT_* needs to be configured by the user; "
+    "otherwise PennyParse may not work correctly."
+)
 
 
 def read_package_text(filename: str) -> str:
@@ -40,9 +49,9 @@ def _read_toml_file(path: Path) -> dict[str, Any]:
 def _env_overrides() -> dict[str, Any]:
     overrides: dict[str, Any] = {}
 
-    base = os.getenv("PENNYPARSE_CHAT_BASE")
-    authkey = os.getenv("PENNYPARSE_CHAT_AUTHKEY") or os.getenv("OPENAI_API_KEY")
-    model = os.getenv("PENNYPARSE_CHAT_MODEL")
+    base = os.getenv(PENNYPARSE_CHAT_ENV_NAMES[0])
+    authkey = os.getenv(PENNYPARSE_CHAT_ENV_NAMES[1]) or os.getenv("OPENAI_API_KEY")
+    model = os.getenv(PENNYPARSE_CHAT_ENV_NAMES[2])
     if base or authkey or model:
         overrides = _deep_merge(
             overrides,
@@ -74,6 +83,10 @@ def _env_overrides() -> dict[str, Any]:
         overrides = _deep_merge(overrides, {"cli": {"timeout": int(cli_timeout)}})
 
     return overrides
+
+
+def has_pennyparse_chat_env() -> bool:
+    return any(os.getenv(name) for name in PENNYPARSE_CHAT_ENV_NAMES)
 
 
 def load_pp_config(

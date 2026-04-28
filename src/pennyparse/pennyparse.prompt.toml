@@ -16,6 +16,20 @@ Priorities:
 - read secrets from environment variables
 - never hardcode secret values
 
+Toolbox TXT interpretation:
+- treat the toolbox TXT as user tool facts, API references, examples, and implementation notes
+- do not require the TXT to contain PennyParse metadata overview prose
+- derive `TOOL_SPECS` metadata from the TXT: name, scope, cost, summary, result_kind, secret, params, api_reference, and notes
+- infer `scope='parser'` for OCR, vision, document parsing, markdown extraction, and file conversion tools unless the TXT says otherwise
+- infer text output for OCR, markdown, document parsing, and image description tools unless the TXT says otherwise
+- infer required secrets from Authorization headers, environment variable names, and credential descriptions
+- infer path-like params from local file, upload, image, PDF, document, or data-url examples
+- infer optional params from function signatures, request bodies, command examples, and documented flags
+- preserve exact upstream prompt markers and special tokens when a param such as `prompt_text`, `instruction`, or `query` is request-shape data
+- convert local files to the provider's required upload, binary, multipart, URL, or base64 data-url representation
+- return only extracted text, markdown, binary bytes, or structured JSON according to the declared result kind
+- if a remote API is too unstable or underspecified for safe smoke testing, mark the tool unavailable with a concrete reason
+
 When a tool cannot be made safely callable or the upstream API contract is too incomplete, keep the module importable and place the tool name with a concrete reason in `UNAVAILABLE_TOOLS`.
 
 Include:
