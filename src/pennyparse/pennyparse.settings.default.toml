@@ -2,6 +2,7 @@
 [aigc.agent]
 max_retry = 3
 max_iter = 5
+max_parallel_subagents = 3
 
 [aigc.api.chatcomp]
 base = "http://localhost:8080/v1"
@@ -19,13 +20,11 @@ num = 3        # >=0
 pdf_page = 3   # >=0
 pdf_page_total_max = 20   # >=0
 
-[orchestrator.decision.threshold]
-by = "LLM"           # majority, LLM, LLM_proofread
-majority_num = 2     # return last result when got $majority_num of same results
-LLM_num = 1          # let LLM* decide/proofread when attempt > $LLM_num
+[reviewer]
+max_length = 1000 # must be substantially less than LLM's context window
 
 [output]
-dir = "output"
+dir = "pennyparse_results"
 ext = "auto"  # auto, txt, md, html
 pdf_perpage_threshold = 5  # if pdf_pages <= $pdf_perpage_threshold, put extracted text in a single output file
 
