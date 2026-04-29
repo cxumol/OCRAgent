@@ -5,6 +5,8 @@ import string
 from pathlib import Path
 from typing import Any, Mapping, TypedDict
 
+from dotenv import load_dotenv
+
 _DEFAULT_SETTINGS_TOML = "pennyparse.settings.default.toml"
 PENNYPARSE_CHAT_ENV_NAMES = (
     "PENNYPARSE_CHAT_BASE",
@@ -95,6 +97,7 @@ def load_pp_config(
     home: Path | None = None,
     argv_overrides: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
+    load_dotenv((cwd or Path.cwd()) / ".env", override=False)
     base = read_package_toml(_DEFAULT_SETTINGS_TOML)
     home_cfg = _read_toml_file((home or Path.home()) / ".pennyparse" / "pennyparse.settings.toml")
     local_cfg = _read_toml_file((cwd or Path.cwd()) / "pennyparse.settings.toml")
@@ -147,10 +150,6 @@ def get_prompt_text(name: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise KeyError(f"prompt {name!r} not found in pennyparse.prompt.toml")
     return value.strip()
-
-
-def get_builtin_toolbox_metadata() -> dict:
-    return read_package_toml("pennyparse.toolbox_builtin.toml")
 
 
 def get_user_toolbox_example_text() -> str:

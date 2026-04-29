@@ -26,6 +26,8 @@ if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
 from pennyparse.cmd import init_docs, tool as tool_cmd  # noqa: E402
+from pennyparse.agent import parser as parser_agent  # noqa: E402
+from pennyparse.agent import reviewer as reviewer_agent  # noqa: E402
 
 
 def _discover_demo_asset(suffixes: set[str]) -> Path:
@@ -45,17 +47,18 @@ def _write_fake_user_toolbox(home: Path) -> None:
                 "TOOL_SPECS = [",
                 "    {",
                 "        'name': 'fake_tool',",
-                "        'kind': 'user',",
                 "        'scope': 'parser',",
                 "        'cost': 'very low',",
-                "        'summary': 'Fake test tool.',",
-                "        'result_kind': 'text',",
+                "        'desc': 'Fake test tool.',",
+                "        'flags': {'path': '/path/to/file'},",
                 "    },",
                 "]",
                 "UNAVAILABLE_TOOLS = {}",
                 "",
                 "def tool_fake_tool(argv):",
-                "    return ''",
+                "    path = argv[argv.index('--path') + 1]",
+                "    with open(path, encoding='utf-8') as handle:",
+                "        return handle.read()",
                 "",
                 "TOOL_HANDLERS = {'fake_tool': tool_fake_tool}",
                 "",
@@ -152,6 +155,49 @@ class InitDocsTests(unittest.TestCase):
 
             if importlib.util.find_spec("pymupdf") is not None:
                 self.assertGreaterEqual(records[rel_pdf]["meta"]["pdf"]["page_count"], 1)
+
+
+class ReviewerTests(unittest.TestCase):
+    def test_reviewer_rejects_empty_text_without_chat_model(self) -> None:
+        with tempfile.TemporaryDirectory() as cwd_raw, tempfile.TemporaryDirectory() as home_raw:
+            with mock.patch.dict(os.environ, {key: "" for key in CHAT_ENV_KEYS}):
+                outcome = reviewer_agent.review_text("", cwd=Path(cwd_raw), home=Path(home_raw))
+
+        self.assertFalse(outcome.ok)
+        self.assertEqual(outcome.status, "major_revision")
+
+    def test_reviewer_accepts_non_empty_text_without_chat_model(self) -> None:
+        with tempfile.TemporaryDirectory() as cwd_raw, tempfile.TemporaryDirectory() as home_raw:
+            with mock.patch.dict(os.environ, {key: "" for key in CHAT_ENV_KEYS}):
+                outcome = reviewer_agent.review_text("usable text", cwd=Path(cwd_raw), home=Path(home_raw))
+
+        self.assertTrue(outcome.ok)
+        self.assertEqual(outcome.status, "pass")
+
+
+class ParserTests(unittest.TestCase):
+    def test_parse_path_writes_output_with_user_parser_from_injected_home(self) -> None:
+        with tempfile.TemporaryDirectory() as cwd_raw, tempfile.TemporaryDirectory() as home_raw:
+            cwd = Path(cwd_raw)
+            home = Path(home_raw)
+            _write_fake_user_toolbox(home)
+            source = cwd / "sample.txt"
+            source.write_text("parsed body\n", encoding="utf-8")
+
+            with mock.patch.dict(os.environ, {key: "" for key in CHAT_ENV_KEYS}):
+                result = parser_agent.parse_path(
+                    source,
+                    cwd=cwd,
+                    home=home,
+                    out_dir=cwd / "out",
+                )
+
+            output_file = Path(result.output_file)
+            self.assertTrue(result.ok)
+            self.assertEqual(result.tool, "fake_tool")
+            self.assertTrue(output_file.exists())
+            self.assertEqual(output_file.name, "sample.txt.txt")
+            self.assertEqual(output_file.read_text(encoding="utf-8"), "parsed body\n")
 
 
 if __name__ == "__main__":

@@ -2,7 +2,7 @@
 generate_user_tools_cli = """
 You generate a single Python module for PennyParse user tools.
 
-Return exactly one ```python fenced code block containing the full module, with no prose before or after it.
+Return exactly one <full_file_code> tag containing one ```python fenced code block with the full module, with no prose before or after it.
 
 Priorities:
 - produce importable Python 3.11 code
@@ -17,17 +17,17 @@ Priorities:
 - never hardcode secret values
 
 Toolbox TXT interpretation:
-- treat the toolbox TXT as user tool facts, API references, examples, and implementation notes
+- treat the toolbox TXT as user tool facts, API or command examples, implementation notes, and caveats
 - do not require the TXT to contain PennyParse metadata overview prose
-- derive `TOOL_SPECS` metadata from the TXT: name, scope, cost, summary, result_kind, secret, params, api_reference, and notes
+- derive only the cmd/tool attributes from the TXT: `name`, `scope`, `cost`, `desc`, `secrets`, and `flags`
+- encode those attributes with the provided sample module and ToolSpec parser
 - infer `scope='parser'` for OCR, vision, document parsing, markdown extraction, and file conversion tools unless the TXT says otherwise
-- infer text output for OCR, markdown, document parsing, and image description tools unless the TXT says otherwise
 - infer required secrets from Authorization headers, environment variable names, and credential descriptions
-- infer path-like params from local file, upload, image, PDF, document, or data-url examples
-- infer optional params from function signatures, request bodies, command examples, and documented flags
-- preserve exact upstream prompt markers and special tokens when a param such as `prompt_text`, `instruction`, or `query` is request-shape data
+- infer path-like flags from local file, upload, image, PDF, document, or data-url examples
+- infer optional flags from function signatures, request bodies, command examples, and documented flags
+- preserve exact upstream prompt markers and special tokens when a flag such as `prompt_text`, `instruction`, or `query` is request-shape data
 - convert local files to the provider's required upload, binary, multipart, URL, or base64 data-url representation
-- return only extracted text, markdown, binary bytes, or structured JSON according to the declared result kind
+- return only extracted text, markdown, binary bytes, or structured JSON
 - if a remote API is too unstable or underspecified for safe runtime use, mark the tool unavailable with a concrete reason
 
 When a tool cannot be made safely callable or the upstream API contract is too incomplete, keep the module importable and place the tool name with a concrete reason in `UNAVAILABLE_TOOLS`.
@@ -37,14 +37,18 @@ Include:
 - `TOOL_HANDLERS: dict[str, callable]`
 - `UNAVAILABLE_TOOLS: dict[str, str]`
 
-`TOOL_SPECS` drives `pennyparse tool --list` and `pennyparse tool <name> --help`.
-Keep it faithful to the source TXT.
+Pseudo-XML loop:
+- use `<full_file_code>` around the full fenced module
+- end tool-request turns with `please run the tool and paste the results below:`
+- use `<status>mission_complete</status>` only after the module passes validation
+
+`TOOL_SPECS` drives `pennyparse tool --list` and `pennyparse tool <name> --help`; keep its user-facing attributes faithful to the source TXT.
 
 Handler result contract:
 - `str` for text output
 - `bytes` for binary output
 - `dict`, `list`, JSON scalar, or `None` for JSON output
-- or `(result_kind, value)` where `result_kind` is `text`, `json`, or `binary`
+- or `(kind, value)` where `kind` is `text`, `json`, or `binary`
 
 Avoid:
 - top-level network calls

@@ -15,7 +15,7 @@ from ..config import (
     pp_config,
 )
 from ..logger import get_logger
-from ..utils import extract_md_codeblock
+from ..utils import extract_md_codeblock, extract_pesudo_xml
 from ..cmd.tool import (
     SAMPLE_DYNAMIC_IMPORT,
     SAMPLE_GENERATED_USER_TOOLBOX,
@@ -24,6 +24,8 @@ from ..cmd.tool import (
     load_user_toolbox_module,
     prompt_builtin_contract_json,
 )
+
+_AGENT_IMPL_MODE = "pesudo_XML"
 
 
 @dataclass(slots=True)
@@ -120,6 +122,9 @@ def _build_initial_prompt(
         "Builtin tool contract metadata:",
         prompt_builtin_contract_json(),
         "",
+        "cmd/tool.py source:",
+        _cmd_tool_source(),
+        "",
         "User toolbox runtime contract:",
         _runtime_contract_text(),
         "",
@@ -134,7 +139,9 @@ def _build_initial_prompt(
 
 def _runtime_contract_text() -> str:
     return (
-        "Return exactly one ```python fenced code block containing the full module, with no prose before or after it.\n\n"
+        "Return exactly one <full_file_code> tag containing one ```python fenced code block with the full module.\n"
+        "End tool-request turns with: please run the tool and paste the results below:\n"
+        "When the generated module is accepted, respond with <status>mission_complete</status>.\n\n"
         + _runtime_contract_header()
     )
 
@@ -142,8 +149,8 @@ def _runtime_contract_text() -> str:
 def _runtime_contract_header() -> str:
     return (
         "The generated file must define TOOL_SPECS, TOOL_HANDLERS, and UNAVAILABLE_TOOLS.\n"
-        "TOOL_SPECS must be a non-empty list of dicts that faithfully describes the generated user tools.\n"
-        "Each TOOL_SPECS item must include name, kind='user', scope, cost, summary, result_kind, secret, params, api_reference, and notes.\n"
+        "TOOL_SPECS must faithfully describe each tool in the cmd/tool shape: name, scope, cost, desc, secrets, flags.\n"
+        "Use the provided sample module and ToolSpec parser as the exact internal schema.\n"
         "Every handler receives argv: list[str], parses args with argparse, and returns a result instead of printing it.\n"
         "Do not print business output to stdout. Do not hardcode secrets. Read required env vars lazily inside handlers.\n"
         "When a tool is intentionally disabled, record the reason in UNAVAILABLE_TOOLS.\n"
@@ -162,16 +169,21 @@ def _extract_python_code(content: Any) -> str:
     else:
         raise RuntimeError("chat completion did not return textual content")
 
+    text = extract_pesudo_xml(text, "full_file_code") or text
     text = extract_md_codeblock(text) or text
     if not text:
         raise RuntimeError("generated user toolbox is empty")
     return text + "\n"
 
 
+def _cmd_tool_source() -> str:
+    return Path(__file__).resolve().parents[1].joinpath("cmd", "tool.py").read_text(encoding="utf-8")
+
+
 def _program_unavailable_reasons(tool_specs: list[ToolSpec]) -> dict[str, str]:
     reasons: dict[str, str] = {}
     for spec in tool_specs:
-        missing = [name for name in spec.secret if not os.getenv(name)]
+        missing = [name for name in spec.secrets if not os.getenv(name)]
         if missing:
             reasons[spec.name] = f"missing required env vars: {', '.join(missing)}"
     return reasons

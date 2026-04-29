@@ -2,6 +2,8 @@
 
 PennyParse loads configuration from TOML files, then applies environment-variable overrides.
 
+`load_pp_config()` also reads `${CWD}/.env` with `python-dotenv` before applying environment overrides. Existing process environment values win over `.env`.
+
 ## Files
 
 Create one or both of these files:
@@ -65,3 +67,14 @@ timeout = 15
 Or override with env:
 
 - `PENNYPARSE_CLI_TIMEOUT`
+
+## Output Settings
+
+```toml
+[output]
+dir = "pennyparse_results"
+ext = "auto"
+max_length = 1000
+```
+
+`pennyparse run` uses `dir` as the default output directory. `ext` may be `auto`, `txt`, `md`, or `html`; `auto` currently writes `txt`. `max_length` limits reviewer prompt input.

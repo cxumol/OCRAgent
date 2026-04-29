@@ -29,6 +29,13 @@ pennyparse init docs --force
 
 The command prints a JSON summary to `stdout` and writes the full memory JSON to `./.pennyparse_memory.txt`.
 
+The memory file includes:
+
+- `summary`: one natural-language overall parsing baseline
+- `groups[].summary`: one natural-language summary per group
+- `files`: machine-readable file records and metadata
+- `previewer`: availability status for builtin and user previewer tools
+
 ## Configuration
 
 Use `./pennyparse.settings.toml` (project) or `~/.pennyparse/pennyparse.settings.toml` (user) to customize:
@@ -48,3 +55,5 @@ Some metadata enrichment is skipped unless these Python modules are importable:
 
 - `PIL` (image width/height)
 - `pymupdf` (PDF page/word counts)
+
+Generated user tools with `scope = "previewer"` are also discovered. If they accept `--path`, their JSON or text result is stored under `files[].meta.previewer.<tool_name>`.

@@ -6,36 +6,30 @@ import io
 import json
 import os
 import re
-import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from types import ModuleType
-from typing import Any, Callable, Iterable, Mapping, cast
+from typing import Any, Callable, Iterable, Mapping
 
-from ..config import (
-    get_builtin_toolbox_metadata,
-    get_user_toolbox_path,
-)
+from ..config import get_user_toolbox_path
 from ..logger import get_logger
 
 USER_TOOLBOX_RUNTIME_CONTRACT = """
 Generate a single Python file at ${HOME}/.pennyparse/user_toolbox.py.
 
-The file must expose:
+The file exposes three runtime objects:
 
-- TOOL_SPECS: list[dict[str, object]]
-  Discovery metadata for the generated user tools.
-- TOOL_HANDLERS: dict[str, callable]
-  Each callable receives argv: list[str].
-- UNAVAILABLE_TOOLS: dict[str, str]
-  When the model decides a tool should stay disabled, write the reason here.
+- TOOL_SPECS describes each generated tool in the cmd/tool shape:
+  name, scope, cost, desc, secrets, flags.
+- TOOL_HANDLERS maps tool names to callables. Each callable receives argv: list[str].
+- UNAVAILABLE_TOOLS maps intentionally disabled tool names to concrete reasons.
 
 Handler return contract:
 
 - str for text results
 - bytes for binary results
 - dict/list/scalar JSON values for json results
-- or a tuple: (result_kind, value)
+- or a tuple: (kind, value), where kind is text, json, or binary
 
 Constraints:
 
@@ -56,18 +50,14 @@ import httpx
 TOOL_SPECS = [
     {
         "name": "example_tool",
-        "kind": "user",
         "scope": "parser",
         "cost": "medium",
-        "summary": "OCR a local image through the example HTTP API.",
-        "result_kind": "text",
-        "secret": ["EXAMPLE_API_KEY"],
-        "params": [
-            {"name": "path", "type": "path", "required": True, "help": "Path to a local image file."},
-            {"name": "prompt_text", "type": "string", "help": "Prompt text sent to the upstream API."},
-        ],
-        "api_reference": "POST https://example.invalid/ocr",
-        "notes": "Return only the OCR text.",
+        "desc": "OCR a local image through the example HTTP API.",
+        "secrets": ["EXAMPLE_API_KEY"],
+        "flags": {
+            "path": "/path/to/image.png",
+            "prompt-text": "OCR this image.",
+        },
     },
 ]
 UNAVAILABLE_TOOLS = {}
@@ -108,10 +98,48 @@ def resolve_entrypoint(entrypoint: str):
 _RESULT_KINDS = {"text", "json", "binary"}
 _TOOL_COST_LEVELS = ("very low", "low", "medium", "high", "very high")
 _TOOL_SCOPES = ("previewer", "parser", "reviewer")
-_DEFAULT_USER_RISK = (
-    "User-defined tools may execute generated Python code and call third-party services. "
-    "Review code, secrets, and upstream APIs before use."
+_BUILTIN_TOOL_SPECS: tuple[dict[str, Any], ...] = (
+    {
+        "name": "img_metadata_px",
+        "scope": "previewer",
+        "cost": "very low",
+        "desc": "Read image pixel dimensions.",
+        "flags": {"path": "/path/to/file.png"},
+    },
+    {
+        "name": "img_thumb",
+        "scope": "previewer",
+        "cost": "very low",
+        "desc": "Render a small PNG thumbnail for an image.",
+        "flags": {"path": "/path/to/file.png"},
+    },
+    {
+        "name": "pdf_metadata",
+        "scope": "previewer",
+        "cost": "low",
+        "desc": "Read basic PDF page and text-layer metadata.",
+        "flags": {"path": "/path/to/file.pdf"},
+    },
+    {
+        "name": "pdf2txt",
+        "scope": "parser",
+        "cost": "low",
+        "desc": "Extract PDF text with PyMuPDF.",
+        "flags": {"path": "/path/to/file.pdf"},
+    },
+    {
+        "name": "pandoc2txt",
+        "scope": "parser",
+        "cost": "low",
+        "desc": "Convert office documents to plain text with Pandoc.",
+        "flags": {"path": "/path/to/file"},
+    },
 )
+_BUILTIN_DEPENDENCIES = {
+    "pdf_metadata": "pymupdf",
+    "pdf2txt": "pymupdf",
+    "pandoc2txt": "pypandoc",
+}
 
 
 class ToolError(RuntimeError):
@@ -159,54 +187,19 @@ def _normalize_scope(value: str) -> str:
 
 
 @dataclass(slots=True)
-class ToolParam:
-    name: str
-    type: str = "string"
-    required: bool = False
-    help: str = ""
-
-    @classmethod
-    def from_mapping(cls, data: Mapping[str, Any]) -> "ToolParam":
-        name = str(data.get("name", "")).strip()
-        if not name:
-            raise ValueError("param name must be a non-empty string")
-        return cls(
-            name=name,
-            type=str(data.get("type", "string")),
-            required=bool(data.get("required", False)),
-            help=str(data.get("help", "")),
-        )
-
-    def flag(self) -> str:
-        return f"--{self.name.replace('_', '-')}"
-
-
-@dataclass(slots=True)
 class ToolSpec:
     name: str
-    kind: str
     scope: str
     cost: str
-    summary: str
-    result_kind: str
-    entrypoint: str = ""
-    availability: str = "always"
-    availability_value: str = ""
-    risk_notice: str = ""
-    api_reference: str = ""
-    notes: str = ""
-    secret: list[str] = field(default_factory=list)
-    params: list[ToolParam] = field(default_factory=list)
+    desc: str
+    secrets: list[str] = field(default_factory=list)
+    flags: dict[str, str] = field(default_factory=dict)
 
     @classmethod
-    def from_mapping(cls, data: Mapping[str, Any], *, default_risk: str = "") -> "ToolSpec":
+    def from_mapping(cls, data: Mapping[str, Any]) -> "ToolSpec":
         name = str(data.get("name", "")).strip()
         if not name:
             raise ValueError("tool name must be a non-empty string")
-
-        kind = str(data.get("kind", "")).strip()
-        if kind not in {"builtin", "user"}:
-            raise ValueError(f"tool {name!r} has invalid kind {kind!r}")
 
         raw_scope = str(data.get("scope", "")).strip()
         if not raw_scope:
@@ -218,64 +211,70 @@ class ToolSpec:
             raise ValueError(f"tool {name!r} is missing cost")
         cost = _normalize_cost(raw_cost)
 
-        summary = str(data.get("summary") or data.get("desc") or "").strip()
-        if not summary:
-            raise ValueError(f"tool {name!r} is missing summary")
+        desc = str(data.get("desc") or "").strip()
+        if not desc:
+            raise ValueError(f"tool {name!r} is missing desc")
 
-        result_kind = str(data.get("result_kind", "")).strip()
-        if result_kind not in _RESULT_KINDS:
-            raise ValueError(f"tool {name!r} has invalid result_kind {result_kind!r}")
-
-        params = [ToolParam.from_mapping(item) for item in data.get("params", []) or []]
-        secret = [str(item) for item in (data.get("secret") or data.get("secrets") or [])]
         return cls(
             name=name,
-            kind=kind,
             scope=scope,
             cost=cost,
-            summary=summary,
-            result_kind=result_kind,
-            entrypoint=str(data.get("entrypoint", "")),
-            availability=str(data.get("availability", "always")),
-            availability_value=str(data.get("availability_value", "")),
-            risk_notice=str(data.get("risk_notice", "") or default_risk or _DEFAULT_USER_RISK),
-            api_reference=str(data.get("api_reference", "")),
-            notes=str(data.get("notes", "")),
-            secret=secret,
-            params=params,
+            desc=desc,
+            secrets=_normalize_secrets(data.get("secrets") or []),
+            flags=_normalize_flags(data.get("flags") or {}),
         )
 
     def usage(self) -> str:
         parts = [f"pennyparse tool {self.name}"]
-        for param in self.params:
-            token = f"{param.flag()} VALUE" if param.type != "bool" else param.flag()
-            if param.required:
-                parts.append(token)
-            else:
-                parts.append(f"[{token}]")
+        for flag, value in self.flags.items():
+            token = f"--{flag}"
+            if value:
+                token = f"{token} VALUE"
+            parts.append(f"[{token}]")
         return " ".join(parts)
+
+    def has_flag(self, name: str) -> bool:
+        wanted = _normalize_flag_name(name)
+        return any(_normalize_flag_name(flag) == wanted for flag in self.flags)
+
+    def flag_token(self, name: str) -> str:
+        wanted = _normalize_flag_name(name)
+        for flag in self.flags:
+            if _normalize_flag_name(flag) == wanted:
+                return f"--{flag}"
+        raise KeyError(name)
 
     def to_prompt_dict(self) -> dict[str, Any]:
         return {
             "name": self.name,
-            "kind": self.kind,
             "scope": self.scope,
             "cost": self.cost,
-            "summary": self.summary,
-            "result_kind": self.result_kind,
-            "secret": list(self.secret),
-            "params": [
-                {
-                    "name": param.name,
-                    "type": param.type,
-                    "required": param.required,
-                    "help": param.help,
-                }
-                for param in self.params
-            ],
-            "api_reference": self.api_reference,
-            "notes": self.notes,
+            "desc": self.desc,
+            "secrets": list(self.secrets),
+            "flags": dict(self.flags),
         }
+
+
+def _normalize_secrets(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        raise ValueError("secrets must be a list")
+    return [str(item).strip() for item in value if str(item).strip()]
+
+
+def _normalize_flags(value: Any) -> dict[str, str]:
+    if not isinstance(value, Mapping):
+        raise ValueError("flags must be a mapping")
+    flags: dict[str, str] = {}
+    for key, example in value.items():
+        name = str(key).strip().lstrip("-")
+        if not name:
+            raise ValueError("flag name must be non-empty")
+        flags[name] = str(example).strip()
+    return flags
+
+
+def _normalize_flag_name(name: str) -> str:
+    return name.strip().lstrip("-").replace("_", "-")
 
 
 @dataclass(slots=True)
@@ -289,6 +288,7 @@ class ToolAvailability:
 class DiscoveredTool:
     spec: ToolSpec
     availability: ToolAvailability
+    source: str
 
 
 @dataclass(slots=True)
@@ -314,9 +314,7 @@ class ToolExecutionResult:
 
 
 def load_builtin_specs() -> list[ToolSpec]:
-    catalog = get_builtin_toolbox_metadata()
-    default_risk = str(catalog.get("claim", "")).strip()
-    return [ToolSpec.from_mapping(item, default_risk=default_risk) for item in catalog.get("tool", []) or []]
+    return [ToolSpec.from_mapping(item) for item in _BUILTIN_TOOL_SPECS]
 
 
 def load_user_specs(
@@ -337,14 +335,12 @@ def load_user_specs(
     if not isinstance(raw_specs, list) or not raw_specs:
         return [], "user toolbox TOOL_SPECS must be a non-empty list"
 
-    raw_risk = getattr(owned_module, "TOOLBOX_RISK_NOTICE", "")
-    default_risk = str(raw_risk).strip() or _DEFAULT_USER_RISK
     specs: list[ToolSpec] = []
     for index, item in enumerate(raw_specs):
         if not isinstance(item, Mapping):
             return [], f"user toolbox TOOL_SPECS[{index}] must be a mapping"
         try:
-            specs.append(ToolSpec.from_mapping(cast(Mapping[str, Any], item), default_risk=default_risk))
+            specs.append(ToolSpec.from_mapping(item))
         except ValueError as exc:
             return [], f"user toolbox TOOL_SPECS[{index}] is invalid: {exc}"
     return specs, None
@@ -372,14 +368,23 @@ def discover_builtin_tools(*, logger=None) -> list[DiscoveredTool]:
     discovered: list[DiscoveredTool] = []
     for spec in load_builtin_specs():
         availability = _check_builtin_availability(spec)
-        discovered.append(DiscoveredTool(spec=spec, availability=availability))
+        discovered.append(DiscoveredTool(spec=spec, availability=availability, source="builtin"))
         _log_unavailable(logger, spec, availability)
     return discovered
 
 
 def discover_user_tools(*, cwd: Path | None = None, logger=None) -> list[DiscoveredTool]:
+    return discover_user_tools_for_home(cwd=cwd, logger=logger)
+
+
+def discover_user_tools_for_home(
+    *,
+    cwd: Path | None = None,
+    home: Path | None = None,
+    logger=None,
+) -> list[DiscoveredTool]:
     logger = logger or get_logger("cmd.tool")
-    module, module_error = load_user_toolbox_module()
+    module, module_error = load_user_toolbox_module(module_path=get_user_toolbox_path(home=home))
     if module_error:
         logger.debug("Skipping user tool discovery: %s", module_error)
         return []
@@ -393,21 +398,30 @@ def discover_user_tools(*, cwd: Path | None = None, logger=None) -> list[Discove
     discovered: list[DiscoveredTool] = []
     for spec in specs:
         availability = _check_user_availability(spec, module=module, module_error=module_error)
-        discovered.append(DiscoveredTool(spec=spec, availability=availability))
+        discovered.append(DiscoveredTool(spec=spec, availability=availability, source="user"))
         _log_unavailable(logger, spec, availability)
     return discovered
 
 
-def list_tools(*, cwd: Path | None = None, logger=None, scope: str | None = None) -> str:
+def list_tools(
+    *,
+    cwd: Path | None = None,
+    home: Path | None = None,
+    logger=None,
+    scope: str | None = None,
+) -> str:
     logger = logger or get_logger("cmd.tool")
-    scope_filter = scope or _read_scope_filter(sys.argv[1:])
+    scope_filter = scope
     if scope_filter is not None:
         try:
             scope_filter = _normalize_scope(scope_filter)
         except ValueError:
             return f"Invalid --scope {scope_filter!r}. Expected: {', '.join(_TOOL_SCOPES)}\n"
 
-    discovered = [*discover_builtin_tools(logger=logger), *discover_user_tools(cwd=cwd, logger=logger)]
+    discovered = [
+        *discover_builtin_tools(logger=logger),
+        *discover_user_tools_for_home(cwd=cwd, home=home, logger=logger),
+    ]
     tools = [_tool_instance(item) for item in discovered]
     if scope_filter is not None:
         tools = [tool for tool in tools if tool.scope == scope_filter]
@@ -433,9 +447,16 @@ def describe_tool(name: str, *, cwd: Path | None = None, logger=None) -> str:
     return _format_tool_help(discovered)
 
 
-def run_tool(name: str, argv: list[str], *, cwd: Path | None = None, logger=None) -> ToolExecutionResult:
+def run_tool(
+    name: str,
+    argv: list[str],
+    *,
+    cwd: Path | None = None,
+    home: Path | None = None,
+    logger=None,
+) -> ToolExecutionResult:
     logger = logger or get_logger("cmd.tool")
-    discovered = _find_tool(name, cwd=cwd, logger=logger)
+    discovered = _find_tool(name, cwd=cwd, home=home, logger=logger)
     if _wants_help(argv):
         return ToolExecutionResult(kind="text", value=_format_tool_help(discovered))
 
@@ -444,15 +465,15 @@ def run_tool(name: str, argv: list[str], *, cwd: Path | None = None, logger=None
             f"{discovered.spec.name} is unavailable: {discovered.availability.reason or 'unknown reason'}"
         )
 
-    if discovered.spec.kind == "builtin":
+    if discovered.source == "builtin":
         handler = _builtin_handler(discovered.spec.name)
         raw_result = handler(argv)
     else:
-        raw_result = _run_user_tool(discovered.spec, argv)
-    return coerce_tool_result(raw_result, expected_kind=discovered.spec.result_kind, tool_name=name)
+        raw_result = _run_user_tool(discovered.spec, argv, home=home)
+    return coerce_tool_result(raw_result, tool_name=name)
 
 
-def coerce_tool_result(result: Any, *, expected_kind: str | None = None, tool_name: str = "") -> ToolExecutionResult:
+def coerce_tool_result(result: Any, *, tool_name: str = "") -> ToolExecutionResult:
     kind: str
     value: Any
 
@@ -479,37 +500,24 @@ def coerce_tool_result(result: Any, *, expected_kind: str | None = None, tool_na
     else:
         raise ToolUsageError(f"{tool_name or 'tool'} returned unsupported result type: {type(result).__name__}")
 
-    if expected_kind and kind != expected_kind:
-        raise ToolUsageError(
-            f"{tool_name or 'tool'} returned {kind}, but metadata declares {expected_kind}"
-        )
     return ToolExecutionResult(kind=kind, value=value)
 
 
-def _find_tool(name: str, *, cwd: Path | None = None, logger=None) -> DiscoveredTool:
+def _find_tool(
+    name: str,
+    *,
+    cwd: Path | None = None,
+    home: Path | None = None,
+    logger=None,
+) -> DiscoveredTool:
     logger = logger or get_logger("cmd.tool")
-    for discovered in [*discover_builtin_tools(logger=logger), *discover_user_tools(cwd=cwd, logger=logger)]:
+    for discovered in [
+        *discover_builtin_tools(logger=logger),
+        *discover_user_tools_for_home(cwd=cwd, home=home, logger=logger),
+    ]:
         if discovered.spec.name == name:
             return discovered
     raise ToolUsageError(f"unknown tool: {name}")
-
-
-def _format_param(param: ToolParam) -> str:
-    token = f"{param.flag()} <{param.type}>"
-    return token if param.required else f"[{token}]"
-
-
-def _read_scope_filter(argv: list[str]) -> str | None:
-    key = "--scope"
-    prefix = f"{key}="
-    for idx, token in enumerate(argv):
-        if token == key:
-            if idx + 1 < len(argv):
-                return argv[idx + 1]
-            return ""
-        if token.startswith(prefix):
-            return token[len(prefix) :]
-    return None
 
 
 def _tool_instance(discovered: DiscoveredTool) -> ToolInstance:
@@ -520,63 +528,31 @@ def _tool_instance(discovered: DiscoveredTool) -> ToolInstance:
         disable_reason=discovered.availability.reason or "",
         cost=spec.cost,
         scope=spec.scope,
-        desc=spec.summary,
-        secrets=list(spec.secret),
-        flags=_tool_flags(spec),
+        desc=spec.desc,
+        secrets=list(spec.secrets),
+        flags=dict(spec.flags),
     )
-
-
-def _tool_flags(spec: ToolSpec) -> dict[str, str]:
-    flags: dict[str, str] = {}
-    for param in spec.params:
-        key = param.flag().lstrip("-")
-        flags[key] = _flag_value_example(param.type, tool_name=spec.name)
-    return flags
-
-
-def _flag_value_example(param_type: str, *, tool_name: str) -> str:
-    param_type = param_type.strip().lower()
-    if param_type == "bool":
-        return ""
-    if param_type == "path":
-        suffix = ""
-        lowered = tool_name.lower()
-        if "pdf" in lowered:
-            suffix = ".pdf"
-        elif "img" in lowered or "image" in lowered:
-            suffix = ".png"
-        return f"/path/to/file{suffix}"
-    if param_type == "int":
-        return "0"
-    if param_type == "float":
-        return "0.0"
-    return "<value>"
 
 
 def _format_tool_help(discovered: DiscoveredTool) -> str:
     spec = discovered.spec
     availability = "yes" if discovered.availability.available else "no"
-    params = spec.params or []
     lines = [
         f"ToolName: {spec.name}",
         f"Usage: {spec.usage()}",
-        f"Kind: {spec.kind}",
         f"Scope: {spec.scope or '-'}",
         f"Cost: {spec.cost or '-'}",
-        f"Summary: {spec.summary or '-'}",
-        f"ResultKind: {spec.result_kind}",
-        f"Risk: {spec.risk_notice or '-'}",
+        f"Desc: {spec.desc or '-'}",
         f"Available: {availability}",
     ]
     if discovered.availability.reason:
         lines.append(f"UnavailableReason: {discovered.availability.reason}")
-    if params:
-        lines.append("Params:")
-        for param in params:
-            required = "required" if param.required else "optional"
-            lines.append(f"  {param.flag()} ({param.type}, {required}) {param.help}".rstrip())
-    if spec.secret:
-        lines.append(f"Secrets: {', '.join(spec.secret)}")
+    if spec.flags:
+        lines.append("Flags:")
+        for flag, value in spec.flags.items():
+            lines.append(f"  --{flag} {value}".rstrip())
+    if spec.secrets:
+        lines.append(f"Secrets: {', '.join(spec.secrets)}")
     return "\n".join(lines) + "\n"
 
 
@@ -596,7 +572,7 @@ def _log_unavailable(logger, spec: ToolSpec, availability: ToolAvailability) -> 
 
 
 def _missing_secrets(spec: ToolSpec) -> list[str]:
-    return [name for name in spec.secret if not os.getenv(name)]
+    return [name for name in spec.secrets if not os.getenv(name)]
 
 
 def _check_builtin_availability(spec: ToolSpec) -> ToolAvailability:
@@ -604,11 +580,12 @@ def _check_builtin_availability(spec: ToolSpec) -> ToolAvailability:
     if missing:
         return ToolAvailability(False, f"missing required env vars: {', '.join(missing)}", "program_rule")
 
-    if spec.availability == "python_module" and spec.availability_value:
-        if importlib.util.find_spec(spec.availability_value) is None:
+    module_name = _BUILTIN_DEPENDENCIES.get(spec.name)
+    if module_name:
+        if importlib.util.find_spec(module_name) is None:
             return ToolAvailability(
                 False,
-                f"python module {spec.availability_value!r} is not importable",
+                f"python module {module_name!r} is not importable",
                 "runtime",
             )
     return ToolAvailability(True)
@@ -658,8 +635,8 @@ def _builtin_handler(name: str) -> Callable[[list[str]], Any]:
         raise ToolUsageError(f"builtin tool handler missing for {name}") from exc
 
 
-def _run_user_tool(spec: ToolSpec, argv: list[str]) -> Any:
-    module, module_error = load_user_toolbox_module()
+def _run_user_tool(spec: ToolSpec, argv: list[str], *, home: Path | None = None) -> Any:
+    module, module_error = load_user_toolbox_module(module_path=get_user_toolbox_path(home=home))
     if module_error:
         raise ToolUnavailableError(module_error)
     assert module is not None

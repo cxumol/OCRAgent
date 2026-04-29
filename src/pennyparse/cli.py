@@ -28,6 +28,7 @@ _INIT_TOOLS_ENTRYPOINT = "pennyparse.cmd.init_tools:run_init_tools"
 _INIT_DOCS_ENTRYPOINT = "pennyparse.cmd.init_docs:run_init_docs"
 _LIST_TOOLS_ENTRYPOINT = "pennyparse.cmd.tool:list_tools"
 _RUN_TOOL_ENTRYPOINT = "pennyparse.cmd.tool:run_tool"
+_RUN_ENTRYPOINT = "pennyparse.cmd.run:run"
 _TOOL_USAGE_ERROR_ENTRYPOINT = "pennyparse.cmd.tool:ToolUsageError"
 _TOOL_UNAVAILABLE_ERROR_ENTRYPOINT = "pennyparse.cmd.tool:ToolUnavailableError"
 _WEB_SERVE_ENTRYPOINT = "pennyparse.web:serve"
@@ -183,6 +184,10 @@ def tool_command(
     ctx: typer.Context,
     tool_name: Annotated[str | None, typer.Argument()] = None,
     list_only: Annotated[bool, typer.Option("--list", help="List builtin and user tools.")] = False,
+    scope: Annotated[
+        str | None,
+        typer.Option("--scope", help="Filter --list output by previewer, parser, or reviewer."),
+    ] = None,
 ):
     """List tools or execute a specific tool."""
     configure_logging()
@@ -192,12 +197,12 @@ def tool_command(
     list_tools = resolve_entrypoint(_LIST_TOOLS_ENTRYPOINT)
 
     if list_only:
-        _write_result("text", list_tools(logger=logger))
+        _write_result("text", list_tools(logger=logger, scope=scope))
         return
 
     if tool_name is None:
         wants_help = any(arg in {"-h", "--help"} for arg in extra_args)
-        result = _TOOL_COMMAND_HELP if wants_help or not extra_args else list_tools(logger=logger)
+        result = _TOOL_COMMAND_HELP if wants_help or not extra_args else list_tools(logger=logger, scope=scope)
         _write_result("text", result)
         return
 
@@ -215,6 +220,30 @@ def tool_command(
         raise typer.Exit(code=1)
     except Exception as exc:  # pragma: no cover - command boundary
         logger.exception("tool command failed: %s", exc)
+        raise typer.Exit(code=1)
+
+
+@app.command("run")
+def run_command(
+    paths: Annotated[
+        list[Path] | None,
+        typer.Argument(help="Files or directories to parse. Defaults to ./.pennyparse_memory.txt when present."),
+    ] = None,
+    out_dir: Annotated[
+        Path,
+        typer.Option("--out-dir", help="Directory for parsed output files."),
+    ] = Path("pennyparse_results"),
+):
+    """Parse documents into the output directory."""
+    configure_logging()
+    logger = get_logger("cli")
+    _warn_missing_chat_env(logger)
+    run = resolve_entrypoint(_RUN_ENTRYPOINT)
+    try:
+        summary = run(paths=paths, out_dir=out_dir, logger=logger)
+        _write_result("json", summary)
+    except Exception as exc:
+        logger.error(str(exc))
         raise typer.Exit(code=1)
 
 

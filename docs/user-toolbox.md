@@ -4,7 +4,7 @@
 
 ## Source Text
 
-Write the toolbox as plain technical prose containing only user tool information: tool names, API references, examples, implementation notes, and caveats. Do not add PennyParse metadata overview prose just to satisfy the generator; the prompt template owns that interpretation layer.
+Write the toolbox as plain technical prose containing only user tool facts: tool names, command or API examples, implementation notes, and caveats. Do not add PennyParse metadata overview prose just to satisfy the generator; the prompt template owns that interpretation layer.
 
 Use `src/pennyparse/pennyparse.toolbox_user.example.txt` as a source-text reference.
 
@@ -13,12 +13,10 @@ For each tool, describe:
 - tool name
 - scope
 - cost
-- summary
-- result kind
-- required secrets
-- params, including name, type, whether required, and short help
-- upstream API shape
-- implementation notes and caveats
+- one-line description
+- required environment variables
+- CLI flags, including required flags and short help
+- API or command shape needed to implement the handler
 
 After editing `${HOME}/pennyparse.toolbox_user.txt` (or your `--from PATH` file), rerun `pennyparse init tools` so the generated runtime stays in sync.
 
@@ -32,8 +30,8 @@ After editing `${HOME}/pennyparse.toolbox_user.txt` (or your `--from PATH` file)
 4. call the configured chat-completions endpoint
 5. extract the final Python module and write it to `${HOME}/.pennyparse/user_toolbox.py`
 6. import the generated module
-7. load `TOOL_SPECS` from the generated module
-8. mark tools unavailable when declared secrets are missing
+7. load generated tool specs
+8. mark tools unavailable when declared env vars are missing
 9. validate that remaining enabled tools expose handlers
 10. feed validation failures back into the next repair turn
 11. stop when the generated runtime contract is valid or the loop limit is reached
@@ -49,17 +47,17 @@ The final stdout result is a JSON summary containing:
 
 ## Runtime Contract
 
-The generated module must define:
+The generated module must define three runtime objects:
 
-- `TOOL_SPECS`
-- `TOOL_HANDLERS`
-- `UNAVAILABLE_TOOLS`
+- `TOOL_SPECS` describes cmd/tool attributes: name, scope, cost, description, env vars, and flags.
+- `TOOL_HANDLERS` maps each name to an `argv` handler.
+- `UNAVAILABLE_TOOLS` stores disabled tool reasons.
 
-`TOOL_SPECS` drives `pennyparse tool --list` and `pennyparse tool <name> --help`. It must stay faithful to the source TXT.
+The generated specs drive `pennyparse tool --list` and `pennyparse tool <name> --help`. They must stay faithful to the source TXT.
 
 Each handler receives `argv: list[str]`, parses its own CLI arguments, and returns data instead of printing it.
 
-The generator prompt requires the model to return the module inside a single fenced Python code block.
+The generator prompt requires the model to return the module inside a `<full_file_code>` pseudo-XML tag containing a single fenced Python code block. The parser also accepts a bare fenced Python block.
 
 ## Developer Notes
 
@@ -70,5 +68,5 @@ The generator agent loop is implemented in `src/pennyparse/agent/init_tools.py`.
 Generated user tools may execute Python code, call remote APIs, invoke local binaries, and handle credentials.
 
 - review generated code before trusting it
-- scope secrets to the smallest possible permission set
+- scope credentials to the smallest possible permission set
 - expect third-party APIs and outputs to drift

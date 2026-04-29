@@ -143,8 +143,8 @@ PaddleOCR-VL compatible HTTP API sketch
 Tool name: paddleocr_vl_parse
 Scope: parser
 Cost: high
-Result kind: text
-Secret: PADDLEOCR_VL_API_KEY
+Required env var: PADDLEOCR_VL_API_KEY
+Required flag: --path /path/to/file.pdf
 
 Upload local file:
 

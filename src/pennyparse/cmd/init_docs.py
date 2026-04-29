@@ -48,7 +48,7 @@ def run_init_docs(
     sampling_cfg = _as_mapping(_as_mapping(pp_cfg.get("init")).get("sampling"))
 
     files = _walk_files(cwd=cwd, ignore_ext=ignore_ext, ignore_folder=ignore_folder)
-    previewer_status, enriched = _enrich_with_preview_metadata(files, cwd=cwd, logger=logger)
+    previewer_status, enriched = _enrich_with_preview_metadata(files, cwd=cwd, home=home, logger=logger)
 
     llm_groups = _group_with_llm(enriched, chat_settings=chat_settings, logger=logger)
     if llm_groups is None:
@@ -68,6 +68,7 @@ def run_init_docs(
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "cwd": str(cwd.resolve()),
         "result_file": str(result_path.resolve()),
+        "summary": _overall_summary(groups),
         "previewer": previewer_status,
         "file_count": len(enriched),
         "files": enriched,
@@ -138,46 +139,76 @@ def _enrich_with_preview_metadata(
     files: list[dict[str, Any]],
     *,
     cwd: Path,
+    home: Path,
     logger,
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
-    discovered = {item.spec.name: item for item in tool_cmd.discover_builtin_tools(logger=logger)}
-    pdf_avail = discovered.get("pdf_metadata")
-    img_avail = discovered.get("img_metadata_px")
+    discovered = [
+        *tool_cmd.discover_builtin_tools(logger=logger),
+        *tool_cmd.discover_user_tools_for_home(cwd=cwd, home=home, logger=logger),
+    ]
+    previewers = [item for item in discovered if item.spec.scope == "previewer"]
     status = {
-        "pdf_metadata": {
-            "available": bool(pdf_avail and pdf_avail.availability.available),
-            "reason": "" if not pdf_avail else (pdf_avail.availability.reason or ""),
-        },
-        "img_metadata_px": {
-            "available": bool(img_avail and img_avail.availability.available),
-            "reason": "" if not img_avail else (img_avail.availability.reason or ""),
-        },
+        item.spec.name: {
+            "available": item.availability.available,
+            "reason": item.availability.reason or "",
+        }
+        for item in previewers
     }
     for record in files:
         ext = record.get("ext") or ""
         abs_path = (cwd / record["path"]).resolve()
         meta = record.setdefault("meta", {})
-        if ext == "pdf" and status["pdf_metadata"]["available"]:
-            try:
-                raw = tool_cmd.pdf_metadata(["--path", str(abs_path)])
-            except Exception as exc:
-                logger.warning("pdf_metadata failed for %s: %s", record["path"], exc)
+        for previewer in previewers:
+            if not previewer.availability.available or not _previewer_accepts_path(previewer):
                 continue
-            meta["pdf"] = {
-                "page_count": int(raw.get("page_count") or 0),
-                "word_count": int(raw.get("word_count") or 0),
-            }
-        elif ext in _IMAGE_EXTS and status["img_metadata_px"]["available"]:
-            try:
-                raw = tool_cmd.img_metadata_px(["--path", str(abs_path)])
-            except Exception as exc:
-                logger.warning("img_metadata_px failed for %s: %s", record["path"], exc)
+            if not _previewer_matches_ext(previewer.spec.name, ext):
                 continue
-            meta["image"] = {
-                "width": int(raw.get("width") or 0),
-                "height": int(raw.get("height") or 0),
-            }
+            try:
+                result = tool_cmd.run_tool(
+                    previewer.spec.name,
+                    ["--path", str(abs_path)],
+                    cwd=cwd,
+                    home=home,
+                    logger=logger,
+                )
+            except Exception as exc:
+                logger.warning("%s failed for %s: %s", previewer.spec.name, record["path"], exc)
+                continue
+            if result.kind == "binary":
+                continue
+            raw = result.value
+            _merge_previewer_meta(meta, previewer.spec.name, raw)
     return status, files
+
+
+def _previewer_accepts_path(previewer: tool_cmd.DiscoveredTool) -> bool:
+    return previewer.spec.has_flag("path")
+
+
+def _previewer_matches_ext(name: str, ext: str) -> bool:
+    if name.startswith("pdf_") or "pdf" in name:
+        return ext == "pdf"
+    if name.startswith("img_") or "image" in name:
+        return ext in _IMAGE_EXTS
+    return True
+
+
+def _merge_previewer_meta(meta: dict[str, Any], name: str, raw: Any) -> None:
+    if name == "pdf_metadata" and isinstance(raw, Mapping):
+        meta["pdf"] = {
+            "page_count": int(raw.get("page_count") or 0),
+            "word_count": int(raw.get("word_count") or 0),
+        }
+        return
+    if name == "img_metadata_px" and isinstance(raw, Mapping):
+        meta["image"] = {
+            "width": int(raw.get("width") or 0),
+            "height": int(raw.get("height") or 0),
+        }
+        return
+    previewer_meta = meta.setdefault("previewer", {})
+    if isinstance(previewer_meta, dict):
+        previewer_meta[name] = raw
 
 
 def _group_with_llm(
@@ -362,7 +393,33 @@ def _add_group_stats(
         group["total_bytes"] = sum(int(item.get("size") or 0) for item in items)
         group["ext_breakdown"] = _ext_breakdown(items)
         group["sample"] = _sample_summary(items, sampling_cfg=sampling_cfg)
+        group["summary"] = _group_summary(group)
     return groups
+
+
+def _group_summary(group: Mapping[str, Any]) -> str:
+    name = str(group.get("name") or "group")
+    file_count = int(group.get("file_count") or 0)
+    baseline = str(group.get("cost_baseline") or "medium")
+    ext_breakdown = _as_mapping(group.get("ext_breakdown"))
+    ext_text = ", ".join(
+        f"{key or 'no_ext'}:{value}"
+        for key, value in sorted(ext_breakdown.items(), key=lambda item: str(item[0]))
+    )
+    if not ext_text:
+        ext_text = "no files"
+    return f"{name}: {file_count} files ({ext_text}); start from {baseline} cost parsing."
+
+
+def _overall_summary(groups: list[dict[str, Any]]) -> str:
+    file_count = sum(int(group.get("file_count") or 0) for group in groups)
+    if not groups:
+        return "No files found; start from medium cost parsing only after adding documents."
+    highest = max(
+        (str(group.get("cost_baseline") or "medium") for group in groups),
+        key=lambda cost: _COST_LEVELS.index(cost) if cost in _COST_LEVELS else _COST_LEVELS.index("medium"),
+    )
+    return f"{file_count} files grouped into {len(groups)} parsing cohorts; start from {highest} cost as the overall baseline."
 
 
 def _ext_breakdown(files: list[dict[str, Any]]) -> dict[str, int]:
