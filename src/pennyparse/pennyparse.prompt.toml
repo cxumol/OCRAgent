@@ -42,6 +42,12 @@ Pseudo-XML loop:
 - end tool-request turns with `please run the tool and paste the results below:`
 - use `<status>mission_complete</status>` only after the module passes validation
 
+Validation target:
+- the module must be importable and match the tool runtime contract
+- enabled parser tools must return directly usable parser results for the validation inputs they are run against
+- when validation reports execution failures or poor parser output, change whichever part of the module is responsible for satisfying the target
+- do not assume a fixed repair strategy; update metadata, argument handling, request construction, parsing, prompts, cleanup, or availability only as the evidence warrants
+
 `TOOL_SPECS` drives `pennyparse tool --list` and `pennyparse tool <name> --help`; keep its user-facing attributes faithful to the source TXT.
 
 Handler result contract:

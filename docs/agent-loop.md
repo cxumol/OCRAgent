@@ -50,9 +50,11 @@ State machine:
 2. Ask the model for a complete `user_toolbox.py`.
 3. Extract the Python code.
 4. Write it to `${HOME}/.pennyparse/user_toolbox.py`.
-5. Import it and validate `TOOL_SPECS`, `TOOL_HANDLERS`, missing secrets, and disabled tools.
+5. Import it and validate `TOOL_SPECS`, `TOOL_HANDLERS`, missing secrets, disabled tools, and any caller-provided result checks.
 6. If validation fails, feed the concrete failures back as the next user message.
 7. Stop when validation passes or `[aigc.agent].max_iter` is reached.
+
+Result checks are validation targets, not repair instructions. They can report execution failures, output excerpts, or parser-quality issues. The model decides which part of `user_toolbox.py` to change: metadata, argument handling, request construction, prompt text, response parsing, cleanup, or availability.
 
 The prompt asks for a full replacement on each repair turn. This keeps the generated module coherent and avoids patch stacking.
 

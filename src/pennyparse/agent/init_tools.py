@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import json
 import os
-from dataclasses import dataclass
+from collections.abc import Callable, Iterable
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -34,14 +35,21 @@ class ValidationRecord:
     ok: bool
     exception: str = ""
     unavailable_reason: str = ""
+    details: dict[str, Any] = field(default_factory=dict)
 
     def as_dict(self) -> dict[str, Any]:
-        return {
+        data = {
             "tool": self.tool,
             "ok": self.ok,
             "exception": self.exception,
             "unavailable_reason": self.unavailable_reason,
         }
+        if self.details:
+            data["details"] = self.details
+        return data
+
+
+ResultValidator = Callable[[Path, list[ToolSpec]], Iterable[ValidationRecord]]
 
 
 def run_init_tools_agent(
@@ -49,6 +57,7 @@ def run_init_tools_agent(
     cwd: Path,
     source_path: Path,
     target_path: Path,
+    result_validator: ResultValidator | None = None,
     logger=None,
 ) -> dict[str, Any]:
     logger = logger or get_logger("agent.init_tools")
@@ -89,6 +98,7 @@ def run_init_tools_agent(
 
             validation = _validate_user_tools(
                 target_path=target_path,
+                result_validator=result_validator,
                 logger=logger,
             )
             summary = _build_summary(
@@ -192,12 +202,14 @@ def _program_unavailable_reasons(tool_specs: list[ToolSpec]) -> dict[str, str]:
 def _validate_user_tools(
     *,
     target_path: Path,
+    result_validator: ResultValidator | None = None,
     logger,
 ) -> dict[str, Any]:
     module, module_error = load_user_toolbox_module(module_path=target_path)
     failures: list[ValidationRecord] = []
     records: list[ValidationRecord] = []
     enabled: list[str] = []
+    enabled_specs: list[ToolSpec] = []
     unavailable: dict[str, str] = {}
 
     if module_error:
@@ -287,8 +299,33 @@ def _validate_user_tools(
 
         record = ValidationRecord(tool=spec.name, ok=True)
         enabled.append(spec.name)
+        enabled_specs.append(spec)
         logger.info("Generated toolbox validation passed for %s", spec.name)
         records.append(record)
+
+    if not failures and result_validator is not None:
+        try:
+            result_records = list(result_validator(target_path, enabled_specs))
+        except Exception as exc:
+            result_records = [
+                ValidationRecord(
+                    tool="__result_validation__",
+                    ok=False,
+                    exception=f"result validation failed to run: {exc!r}",
+                )
+            ]
+
+        for record in result_records:
+            records.append(record)
+            if record.ok:
+                logger.info("Generated toolbox result validation passed for %s", record.tool)
+                continue
+            failures.append(record)
+            logger.error(
+                "Generated toolbox result validation failed for %s: %s",
+                record.tool,
+                record.exception or record.details,
+            )
 
     return {
         "records": records,
@@ -302,7 +339,9 @@ def _build_repair_feedback(validation: Mapping[str, Any]) -> str:
     failures = [record.as_dict() for record in validation["failures"]]
     unavailable = validation["unavailable"]
     return (
-        "The generated file failed runtime-contract validation. Return a full replacement for user_toolbox.py inside exactly one ```python fenced code block.\n\n"
+        "The generated file failed validation. Return a full replacement for user_toolbox.py inside exactly one ```python fenced code block.\n\n"
+        "Validation may report structural errors, unavailable tools, execution failures, or output-quality issues from parser results.\n"
+        "Choose the smallest coherent code change that makes the generated tools satisfy the reported target.\n"
         "Keep tools listed in UNAVAILABLE_TOOLS disabled only when you cannot make them safe and callable.\n"
         "Do not print business output to stdout.\n\n"
         "Current unavailable tools:\n"

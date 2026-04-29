@@ -304,6 +304,103 @@ class PseudoXmlTests(unittest.TestCase):
     def test_init_tools_agent_declares_pseudo_xml_mode(self) -> None:
         self.assertEqual(init_tools_agent._AGENT_IMPL_MODE, "pseudo_XML")
 
+    def test_init_tools_agent_repairs_from_result_validation_feedback(self) -> None:
+        first_module = """
+TOOL_SPECS = [
+    {
+        "name": "demo_ocr",
+        "scope": "parser",
+        "cost": "low",
+        "desc": "Demo OCR.",
+        "flags": {"path": "/path/to/image.png"},
+    }
+]
+UNAVAILABLE_TOOLS = {}
+
+def tool_demo_ocr(argv):
+    return {"provider_payload": {"blocks": [{"text": "extracted text"}]}}
+
+TOOL_HANDLERS = {"demo_ocr": tool_demo_ocr}
+"""
+        second_module = """
+TOOL_SPECS = [
+    {
+        "name": "demo_ocr",
+        "scope": "parser",
+        "cost": "low",
+        "desc": "Demo OCR.",
+        "flags": {"path": "/path/to/image.png"},
+    }
+]
+UNAVAILABLE_TOOLS = {}
+
+def tool_demo_ocr(argv):
+    return "extracted text"
+
+TOOL_HANDLERS = {"demo_ocr": tool_demo_ocr}
+"""
+        seen_messages: list[str] = []
+
+        class FakeChatClient:
+            def __init__(self, **kwargs):
+                self.calls = 0
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc_value, traceback):
+                pass
+
+            def complete(self, session, **kwargs):
+                self.calls += 1
+                seen_messages.append(session.messages[-1]["content"])
+                code = first_module if self.calls == 1 else second_module
+                message = {"role": "assistant", "content": f"```python\n{code}\n```"}
+                session.messages.append(message)
+                return message
+
+        def result_validator(target_path: Path, specs: list[tool_cmd.ToolSpec]):
+            module, module_error = tool_cmd.load_user_toolbox_module(module_path=target_path)
+            testcase = self
+            testcase.assertIsNone(module_error)
+            testcase.assertEqual([spec.name for spec in specs], ["demo_ocr"])
+            raw = module.TOOL_HANDLERS["demo_ocr"](["--path", str(DEMO_ASSETS / "vl1.58.png")])
+            if raw == "extracted text":
+                return [init_tools_agent.ValidationRecord(tool="demo_ocr", ok=True)]
+            return [
+                init_tools_agent.ValidationRecord(
+                    tool="demo_ocr",
+                    ok=False,
+                    exception="parser result did not expose the extracted text directly",
+                    details={"output_excerpt": json.dumps(raw, ensure_ascii=False)},
+                )
+            ]
+
+        with tempfile.TemporaryDirectory() as cwd_raw, tempfile.TemporaryDirectory() as home_raw:
+            cwd = Path(cwd_raw)
+            home = Path(home_raw)
+            source = cwd / "pennyparse.toolbox_user.txt"
+            target = home / ".pennyparse" / "user_toolbox.py"
+            target.parent.mkdir(parents=True)
+            source.write_text("Tool: demo_ocr\n", encoding="utf-8")
+
+            with (
+                mock.patch.dict(os.environ, {"PENNYPARSE_CHAT_MODEL": "unit-test-model"}),
+                mock.patch("pennyparse.agent.init_tools.ChatClient", FakeChatClient),
+            ):
+                summary = init_tools_agent.run_init_tools_agent(
+                    cwd=cwd,
+                    source_path=source,
+                    target_path=target,
+                    result_validator=result_validator,
+                )
+
+        self.assertTrue(summary["ok"])
+        self.assertEqual(summary["agent_turns"], 2)
+        self.assertIn("output-quality issues", seen_messages[1])
+        self.assertIn("parser result did not expose the extracted text directly", seen_messages[1])
+        self.assertIn('return "extracted text"', target.read_text(encoding="utf-8"))
+
 
 class InitCliTests(unittest.TestCase):
     def test_init_root_runs_aggregate_with_force_and_toolbox_source(self) -> None:
