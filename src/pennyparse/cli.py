@@ -26,6 +26,7 @@ app.add_typer(init_app, name="init")
 
 _INIT_TOOLS_ENTRYPOINT = "pennyparse.cmd.init_tools:run_init_tools"
 _INIT_DOCS_ENTRYPOINT = "pennyparse.cmd.init_docs:run_init_docs"
+_INIT_ENTRYPOINT = "pennyparse.cmd.init:run_init"
 _LIST_TOOLS_ENTRYPOINT = "pennyparse.cmd.tool:list_tools"
 _RUN_TOOL_ENTRYPOINT = "pennyparse.cmd.tool:run_tool"
 _RUN_ENTRYPOINT = "pennyparse.cmd.run:run"
@@ -110,6 +111,61 @@ def _confirm_overwrite(path: Path) -> bool:
     return answer in {"y", "yes"}
 
 
+@init_app.callback(invoke_without_command=True)
+def init_command(
+    ctx: typer.Context,
+    force: Annotated[
+        bool,
+        typer.Option("--force", "-f", help="Overwrite generated init assets without prompting."),
+    ] = False,
+    source_path: Annotated[
+        Path | None,
+        typer.Option(
+            "--from",
+            help="Path to pennyparse.toolbox_user.txt (default: $HOME/pennyparse.toolbox_user.txt).",
+        ),
+    ] = None,
+):
+    """Generate user toolbox and current-directory parser memory."""
+    if ctx.invoked_subcommand is not None:
+        return
+
+    configure_logging()
+    logger = get_logger("cli")
+    _warn_missing_chat_env(logger)
+
+    tools_path = get_user_toolbox_path()
+    docs_path = Path.cwd() / ".pennyparse_memory.txt"
+    overwrite_tools = force or (not tools_path.exists()) or _confirm_overwrite(tools_path)
+    overwrite_docs = force or (not docs_path.exists()) or _confirm_overwrite(docs_path)
+
+    if tools_path.exists() and not overwrite_tools:
+        logger.error("Refusing to overwrite existing %s (use --force to override).", tools_path)
+        raise typer.Exit(code=1)
+    if docs_path.exists() and not overwrite_docs:
+        logger.error("Refusing to overwrite existing %s (use --force to override).", docs_path)
+        raise typer.Exit(code=1)
+
+    run_init = resolve_entrypoint(_INIT_ENTRYPOINT)
+    try:
+        summary = run_init(
+            overwrite_tools=overwrite_tools,
+            overwrite_docs=overwrite_docs,
+            source_path=source_path,
+            logger=logger,
+        )
+        _write_result("json", summary)
+        tools_summary = summary.get("tools") if isinstance(summary, dict) else None
+        result_file = tools_summary.get("result_file") if isinstance(tools_summary, dict) else None
+        logger.warning("Review %s for security before running user tools.", result_file or tools_path)
+    except (FileNotFoundError, RuntimeError) as exc:
+        logger.error(str(exc))
+        raise typer.Exit(code=1)
+    except Exception as exc:
+        logger.exception("init failed: %s", exc)
+        raise typer.Exit(code=1)
+
+
 @init_app.command("tools")
 def init_tools(
     force: Annotated[
@@ -117,12 +173,12 @@ def init_tools(
         typer.Option("--force", "-f", help="Overwrite ~/.pennyparse/user_toolbox.py without prompting."),
     ] = False,
     source_path: Annotated[
-        Path,
+        Path | None,
         typer.Option(
             "--from",
             help="Path to pennyparse.toolbox_user.txt (default: $HOME/pennyparse.toolbox_user.txt).",
         ),
-    ] = Path.home() / "pennyparse.toolbox_user.txt",
+    ] = None,
 ):
     """Generate ~/.pennyparse/user_toolbox.py from a toolbox TXT file."""
     configure_logging()

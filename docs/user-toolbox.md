@@ -57,7 +57,7 @@ The generated specs drive `pennyparse tool --list` and `pennyparse tool <name> -
 
 Each handler receives `argv: list[str]`, parses its own CLI arguments, and returns data instead of printing it.
 
-The generator prompt requires the model to return the module inside a `<full_file_code>` pseudo-XML tag containing a single fenced Python code block. The parser also accepts a bare fenced Python block.
+The generator prompt requires the model to return the module inside a `<full_file_code>` pseudo-XML tag containing a single fenced Python code block. The extractor API is `extract_pseudo_xml`, with `extract_pesudo_xml` kept as a compatibility alias for older callers. The parser also accepts a bare fenced Python block.
 
 ## Developer Notes
 

@@ -10,6 +10,8 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
+from typer.testing import CliRunner
+
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SRC_ROOT = REPO_ROOT / "src"
@@ -27,10 +29,12 @@ if str(SRC_ROOT) not in sys.path:
 
 from pennyparse.cmd import init_docs, tool as tool_cmd  # noqa: E402
 from pennyparse.cmd import run as run_cmd  # noqa: E402
+from pennyparse import cli as cli_module  # noqa: E402
+from pennyparse.agent import init_tools as init_tools_agent  # noqa: E402
 from pennyparse.agent import parser as parser_agent  # noqa: E402
 from pennyparse.agent import reviewer as reviewer_agent  # noqa: E402
 from pennyparse._client import ChatSession  # noqa: E402
-from pennyparse import utils_aigc  # noqa: E402
+from pennyparse import utils, utils_aigc  # noqa: E402
 
 
 def _discover_demo_asset(suffixes: set[str]) -> Path:
@@ -123,6 +127,25 @@ def _write_fake_settings(home: Path) -> None:
     )
 
 
+def _write_init_sampling_settings(cwd: Path) -> None:
+    (cwd / "pennyparse.settings.toml").write_text(
+        "\n".join(
+            [
+                "[aigc.api.chatcomp]",
+                'model = "unit-test-model"',
+                "",
+                "[init.sampling]",
+                'by = "first"',
+                "num = 1",
+                "pdf_page = 1",
+                "pdf_page_total_max = 1",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+
 def _write_parser_batch_settings(cwd: Path, batch_size: int) -> None:
     (cwd / "pennyparse.settings.toml").write_text(
         "\n".join(
@@ -204,6 +227,174 @@ class InitDocsTests(unittest.TestCase):
 
             if importlib.util.find_spec("pymupdf") is not None:
                 self.assertIn("pdf", memory.lower())
+
+    def test_run_init_docs_samples_with_low_cost_tool(self) -> None:
+        image_asset = _discover_demo_asset(IMAGE_SUFFIXES)
+
+        with tempfile.TemporaryDirectory() as cwd_raw, tempfile.TemporaryDirectory() as home_raw:
+            cwd = Path(cwd_raw)
+            home = Path(home_raw)
+            fixtures = cwd / "fixtures"
+            fixtures.mkdir()
+            copied_image = Path(shutil.copy2(image_asset, fixtures / image_asset.name))
+
+            _write_fake_image_user_toolbox(home)
+            _write_init_sampling_settings(cwd)
+
+            with (
+                mock.patch.dict(os.environ, {key: "" for key in CHAT_ENV_KEYS}),
+                mock.patch("pennyparse.cmd.init_docs._group_with_llm", return_value=None),
+            ):
+                summary = init_docs.run_init_docs(overwrite=False, cwd=cwd, home=home)
+
+            memory = (cwd / ".pennyparse_memory.txt").read_text(encoding="utf-8")
+            sampled_files = [
+                item
+                for group in summary["groups"]
+                for item in group["sample"]["files"]
+            ]
+
+            self.assertTrue(summary["ok"])
+            self.assertIn("Sample check:", memory)
+            self.assertIn("fake_ocr: OCR", memory)
+            self.assertEqual(sampled_files[0]["path"], copied_image.relative_to(cwd).as_posix())
+            self.assertIn("fake_ocr: OCR", sampled_files[0]["observation"])
+
+    def test_sample_tools_skip_path_tools_with_extra_required_flags(self) -> None:
+        path_only = tool_cmd.DiscoveredTool(
+            spec=tool_cmd.ToolSpec.from_mapping(
+                {
+                    "name": "pdf2txt",
+                    "scope": "parser",
+                    "cost": "low",
+                    "desc": "PDF text",
+                    "flags": {"path": "/tmp/a.pdf"},
+                }
+            ),
+            availability=tool_cmd.ToolAvailability(True),
+            source="builtin",
+        )
+        needs_out_dir = tool_cmd.DiscoveredTool(
+            spec=tool_cmd.ToolSpec.from_mapping(
+                {
+                    "name": "pdf_pages_to_images",
+                    "scope": "parser",
+                    "cost": "medium",
+                    "desc": "Render pages",
+                    "flags": {"path": "/tmp/a.pdf", "out-dir": "/tmp/pages"},
+                }
+            ),
+            availability=tool_cmd.ToolAvailability(True),
+            source="builtin",
+        )
+
+        selected = init_docs._sample_tools_for_ext([needs_out_dir, path_only], "pdf")
+
+        self.assertEqual([item.spec.name for item in selected], ["pdf2txt"])
+
+
+class PseudoXmlTests(unittest.TestCase):
+    def test_extract_pseudo_xml_keeps_legacy_alias(self) -> None:
+        text = "<item>first</item>\n<item attr='x'>second</item>"
+
+        self.assertEqual(utils.extract_pseudo_xml(text, "item"), "second")
+        self.assertIs(utils.extract_pesudo_xml, utils.extract_pseudo_xml)
+        self.assertEqual(utils.extract_pesudo_xml(text, "item"), "second")
+
+    def test_init_tools_agent_declares_pseudo_xml_mode(self) -> None:
+        self.assertEqual(init_tools_agent._AGENT_IMPL_MODE, "pseudo_XML")
+
+
+class InitCliTests(unittest.TestCase):
+    def test_init_root_runs_aggregate_with_force_and_toolbox_source(self) -> None:
+        runner = CliRunner()
+
+        with tempfile.TemporaryDirectory() as cwd_raw, tempfile.TemporaryDirectory() as home_raw:
+            cwd = Path(cwd_raw)
+            home = Path(home_raw)
+            source = cwd / "custom.toolbox.txt"
+            source.write_text("toolbox\n", encoding="utf-8")
+            calls: list[dict[str, object]] = []
+
+            def fake_run_init(**kwargs):
+                calls.append(kwargs)
+                return {
+                    "ok": True,
+                    "tools": {
+                        "ok": True,
+                        "result_file": str(home / ".pennyparse" / "user_toolbox.py"),
+                    },
+                    "docs": {"ok": True, "result_file": str(cwd / ".pennyparse_memory.txt")},
+                }
+
+            def fake_resolve(entrypoint):
+                self.assertEqual(entrypoint, cli_module._INIT_ENTRYPOINT)
+                return fake_run_init
+
+            old_cwd = Path.cwd()
+            os.chdir(cwd)
+            try:
+                with (
+                    mock.patch.dict(
+                        os.environ,
+                        {"HOME": str(home), "PENNYPARSE_CHAT_MODEL": "unit-test-model"},
+                    ),
+                    mock.patch.object(cli_module, "resolve_entrypoint", side_effect=fake_resolve),
+                ):
+                    result = runner.invoke(
+                        cli_module.app,
+                        ["init", "--force", "--from", str(source)],
+                    )
+            finally:
+                os.chdir(old_cwd)
+
+        self.assertEqual(result.exit_code, 0, result.output)
+        self.assertEqual(len(calls), 1)
+        self.assertTrue(calls[0]["overwrite_tools"])
+        self.assertTrue(calls[0]["overwrite_docs"])
+        self.assertEqual(calls[0]["source_path"], source)
+        self.assertTrue(json.loads(result.stdout)["ok"])
+
+    def test_init_tools_subcommand_keeps_specific_entrypoint(self) -> None:
+        runner = CliRunner()
+
+        with tempfile.TemporaryDirectory() as cwd_raw, tempfile.TemporaryDirectory() as home_raw:
+            cwd = Path(cwd_raw)
+            home = Path(home_raw)
+            source = cwd / "custom.toolbox.txt"
+            source.write_text("toolbox\n", encoding="utf-8")
+            calls: list[dict[str, object]] = []
+
+            def fake_run_init_tools(**kwargs):
+                calls.append(kwargs)
+                return {"ok": True, "result_file": str(home / ".pennyparse" / "user_toolbox.py")}
+
+            def fake_resolve(entrypoint):
+                self.assertEqual(entrypoint, cli_module._INIT_TOOLS_ENTRYPOINT)
+                return fake_run_init_tools
+
+            old_cwd = Path.cwd()
+            os.chdir(cwd)
+            try:
+                with (
+                    mock.patch.dict(
+                        os.environ,
+                        {"HOME": str(home), "PENNYPARSE_CHAT_MODEL": "unit-test-model"},
+                    ),
+                    mock.patch.object(cli_module, "resolve_entrypoint", side_effect=fake_resolve),
+                ):
+                    result = runner.invoke(
+                        cli_module.app,
+                        ["init", "tools", "--force", "--from", str(source)],
+                    )
+            finally:
+                os.chdir(old_cwd)
+
+        self.assertEqual(result.exit_code, 0, result.output)
+        self.assertEqual(len(calls), 1)
+        self.assertTrue(calls[0]["overwrite"])
+        self.assertEqual(calls[0]["source_path"], source)
+        self.assertTrue(json.loads(result.stdout)["ok"])
 
 
 class ReviewerTests(unittest.TestCase):

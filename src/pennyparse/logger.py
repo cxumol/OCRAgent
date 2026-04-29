@@ -16,6 +16,8 @@ def configure_logging(*, cwd: Path | None = None, level: int = logging.INFO) -> 
     if _CONFIGURED_LOG_PATH == log_path and logger.handlers:
         return log_path
 
+    for handler in logger.handlers:
+        handler.close()
     logger.handlers.clear()
     logger.setLevel(level)
     logger.propagate = False

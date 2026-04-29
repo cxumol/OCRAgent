@@ -7,6 +7,7 @@
 - `pennyparse tool --list [--scope=previewer|parser|reviewer]`
 - `pennyparse tool <toolname> [args...]`
 - `pennyparse tool <toolname> --help`
+- `pennyparse init [--from PATH] [-f]`
 - `pennyparse init tools [--from PATH] [-f]`
 - `pennyparse init docs [-f]`
 - `pennyparse run [--out-dir DIR] [PATH ...]`
@@ -28,6 +29,13 @@
 - Generated user runtime: `${HOME}/.pennyparse/user_toolbox.py`
 
 `pennyparse init tools` reads the toolbox TXT and generates `${HOME}/.pennyparse/user_toolbox.py` directly.
+
+`pennyparse init` runs the full initialization sequence:
+
+- generate `${HOME}/.pennyparse/user_toolbox.py` from the toolbox TXT
+- generate `./.pennyparse_memory.txt` for the current directory
+
+Use `pennyparse init --from PATH` to pass a non-default toolbox source into the tools step. Use `-f` / `--force` to overwrite both generated init assets.
 
 User tool discovery reads the generated module, not the source TXT. The module keeps the runtime contract small:
 

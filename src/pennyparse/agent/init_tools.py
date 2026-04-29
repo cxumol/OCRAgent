@@ -15,7 +15,7 @@ from ..config import (
     pp_config,
 )
 from ..logger import get_logger
-from ..utils import extract_md_codeblock, extract_pesudo_xml
+from ..utils import extract_md_codeblock, extract_pseudo_xml
 from ..cmd.tool import (
     SAMPLE_DYNAMIC_IMPORT,
     SAMPLE_GENERATED_USER_TOOLBOX,
@@ -25,7 +25,7 @@ from ..cmd.tool import (
     prompt_builtin_contract_json,
 )
 
-_AGENT_IMPL_MODE = "pesudo_XML"
+_AGENT_IMPL_MODE = "pseudo_XML"
 
 
 @dataclass(slots=True)
@@ -169,7 +169,7 @@ def _extract_python_code(content: Any) -> str:
     else:
         raise RuntimeError("chat completion did not return textual content")
 
-    text = extract_pesudo_xml(text, "full_file_code") or text
+    text = extract_pseudo_xml(text, "full_file_code") or text
     text = extract_md_codeblock(text) or text
     if not text:
         raise RuntimeError("generated user toolbox is empty")

@@ -8,6 +8,7 @@ def run_init(
     *,
     overwrite_tools: bool,
     overwrite_docs: bool,
+    source_path: Path | None = None,
     cwd: Path | None = None,
     home: Path | None = None,
     logger=None,
@@ -17,6 +18,7 @@ def run_init(
 
     tools_summary = run_init_tools(
         overwrite=overwrite_tools,
+        source_path=source_path,
         cwd=cwd,
         home=home,
         logger=logger,
@@ -32,4 +34,3 @@ def run_init(
         "tools": tools_summary,
         "docs": docs_summary,
     }
-

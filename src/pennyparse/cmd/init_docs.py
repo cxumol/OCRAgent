@@ -13,7 +13,9 @@ from ..utils import extract_md_codeblock
 from . import tool as tool_cmd
 
 _COST_LEVELS = ("very low", "low", "medium", "high", "very high")
+_SAMPLE_TOOL_COSTS = {"very low", "low", "medium"}
 _IMAGE_EXTS = {"png", "jpg", "jpeg", "webp", "bmp", "tif", "tiff"}
+_OFFICE_EXTS = {"doc", "docx", "ppt", "pptx", "xls", "xlsx", "odt", "ods", "odp"}
 
 
 def run_init_docs(
@@ -46,8 +48,9 @@ def run_init_docs(
     ignore_folder = {str(item) for item in (ignore_cfg.get("folder") or [])}
     sampling_cfg = _as_mapping(_as_mapping(pp_cfg.get("init")).get("sampling"))
 
+    tools = _discover_tools(cwd=cwd, home=home, logger=logger)
     files = _walk_files(cwd=cwd, ignore_ext=ignore_ext, ignore_folder=ignore_folder)
-    _previewer_status, enriched = _enrich_with_preview_metadata(files, cwd=cwd, home=home, logger=logger)
+    _previewer_status, enriched = _enrich_with_preview_metadata(files, tools=tools, cwd=cwd, home=home, logger=logger)
 
     llm_groups = _group_with_llm(enriched, chat_settings=chat_settings, logger=logger)
     if llm_groups is None:
@@ -60,7 +63,7 @@ def run_init_docs(
             groups, unmatched = _group_heuristic(enriched)
 
     groups, unmatched_count = _finalize_groups(groups, unmatched)
-    groups = _add_group_stats(groups, enriched, sampling_cfg=sampling_cfg)
+    groups = _add_group_stats(groups, enriched, sampling_cfg=sampling_cfg, tools=tools, cwd=cwd, home=home, logger=logger)
 
     memory = _memory_text(groups)
     result_path.write_text(memory, encoding="utf-8")
@@ -80,15 +83,22 @@ def _as_mapping(value: Any) -> Mapping[str, Any]:
 def _chat_settings(pp_cfg: Mapping[str, Any]) -> dict[str, Any]:
     chat = _as_mapping(_as_mapping(_as_mapping(pp_cfg.get("aigc")).get("api")).get("chatcomp"))
     base_url = str(chat.get("base") or "").strip()
+    model = str(chat.get("model") or "").strip()
     if not base_url:
         raise RuntimeError("aigc.api.chatcomp.base is required")
     authkey = str(chat.get("authkey") or "").strip()
-    model = str(chat.get("model") or "").strip()
     return {
         "base_url": base_url,
         "api_key": authkey or None,
         "model": model or None,
     }
+
+
+def _discover_tools(*, cwd: Path, home: Path, logger) -> list[tool_cmd.DiscoveredTool]:
+    return [
+        *tool_cmd.discover_builtin_tools(logger=logger),
+        *tool_cmd.discover_user_tools_for_home(cwd=cwd, home=home, logger=logger),
+    ]
 
 
 def _walk_files(*, cwd: Path, ignore_ext: set[str], ignore_folder: set[str]) -> list[dict[str, Any]]:
@@ -126,15 +136,12 @@ def _walk_files(*, cwd: Path, ignore_ext: set[str], ignore_folder: set[str]) -> 
 def _enrich_with_preview_metadata(
     files: list[dict[str, Any]],
     *,
+    tools: list[tool_cmd.DiscoveredTool],
     cwd: Path,
     home: Path,
     logger,
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
-    discovered = [
-        *tool_cmd.discover_builtin_tools(logger=logger),
-        *tool_cmd.discover_user_tools_for_home(cwd=cwd, home=home, logger=logger),
-    ]
-    previewers = [item for item in discovered if item.spec.scope == "previewer"]
+    previewers = [item for item in tools if item.spec.scope == "previewer"]
     status = {
         item.spec.name: {
             "available": item.availability.available,
@@ -205,6 +212,10 @@ def _group_with_llm(
     chat_settings: Mapping[str, Any],
     logger,
 ) -> list[dict[str, Any]] | None:
+    if not chat_settings.get("model"):
+        logger.info("LLM grouping skipped: chat model is not configured")
+        return None
+
     prompt = (
         "You group local document files by parsing difficulty.\n"
         "Input: a JSON list of file records with relative paths and metadata.\n"
@@ -327,7 +338,7 @@ def _group_heuristic(files: list[dict[str, Any]]) -> tuple[list[dict[str, Any]],
                 pdf_scanned.append(path)
         elif ext in _IMAGE_EXTS:
             images.append(path)
-        elif ext in {"doc", "docx", "ppt", "pptx", "xls", "xlsx", "odt", "ods", "odp"}:
+        elif ext in _OFFICE_EXTS:
             office.append(path)
         else:
             other.append(path)
@@ -372,6 +383,10 @@ def _add_group_stats(
     files: list[dict[str, Any]],
     *,
     sampling_cfg: Mapping[str, Any],
+    tools: list[tool_cmd.DiscoveredTool],
+    cwd: Path,
+    home: Path,
+    logger,
 ) -> list[dict[str, Any]]:
     index = {str(item["path"]): item for item in files}
     for group in groups:
@@ -380,7 +395,14 @@ def _add_group_stats(
         group["file_count"] = len(items)
         group["total_bytes"] = sum(int(item.get("size") or 0) for item in items)
         group["ext_breakdown"] = _ext_breakdown(items)
-        group["sample"] = _sample_summary(items, sampling_cfg=sampling_cfg)
+        group["sample"] = _sample_summary(
+            items,
+            sampling_cfg=sampling_cfg,
+            tools=tools,
+            cwd=cwd,
+            home=home,
+            logger=logger,
+        )
         group["summary"] = _group_summary(group)
     return groups
 
@@ -398,11 +420,13 @@ def _group_summary(group: Mapping[str, Any]) -> str:
         ext_text = "no files"
     sample_paths = _sample_paths_for_text(group)
     sample_text = f" such as {sample_paths}" if sample_paths else ""
+    observations = _sample_observations_for_text(group)
+    observation_text = f" Sample check: {observations}." if observations else ""
     difficulty = _difficulty_text(baseline)
     return (
         f"{name} group contains {file_count} file(s) ({ext_text}){sample_text}; "
         f"the filename and preview metadata suggest {difficulty} parsing difficulty; "
-        f"start from {baseline} cost parsing."
+        f"start from {baseline} cost parsing.{observation_text}"
     )
 
 
@@ -439,6 +463,19 @@ def _sample_paths_for_text(group: Mapping[str, Any]) -> str:
     return ", ".join(paths) + suffix
 
 
+def _sample_observations_for_text(group: Mapping[str, Any]) -> str:
+    sample = _as_mapping(group.get("sample"))
+    files = sample.get("files")
+    if not isinstance(files, list):
+        return ""
+    observations = [
+        _clip_text(str(item.get("observation") or ""), limit=160)
+        for item in files
+        if isinstance(item, Mapping) and str(item.get("observation") or "").strip()
+    ]
+    return "; ".join(observations[:2])
+
+
 def _difficulty_text(cost: str) -> str:
     if cost in {"very low", "low"}:
         return "low"
@@ -455,7 +492,15 @@ def _ext_breakdown(files: list[dict[str, Any]]) -> dict[str, int]:
     return dict(sorted(breakdown.items(), key=lambda item: item[0]))
 
 
-def _sample_summary(files: list[dict[str, Any]], *, sampling_cfg: Mapping[str, Any]) -> dict[str, Any]:
+def _sample_summary(
+    files: list[dict[str, Any]],
+    *,
+    sampling_cfg: Mapping[str, Any],
+    tools: list[tool_cmd.DiscoveredTool],
+    cwd: Path,
+    home: Path,
+    logger,
+) -> dict[str, Any]:
     mode = str(sampling_cfg.get("by") or "random").strip().lower()
     num = int(sampling_cfg.get("num") or 0)
     pdf_page = int(sampling_cfg.get("pdf_page") or 0)
@@ -473,6 +518,7 @@ def _sample_summary(files: list[dict[str, Any]], *, sampling_cfg: Mapping[str, A
             "ext": item.get("ext") or "",
             "size": int(item.get("size") or 0),
             "meta": item.get("meta") or {},
+            "observation": _sample_observation(item, tools=tools, cwd=cwd, home=home, logger=logger),
         }
         for item in picked
     ]
@@ -513,3 +559,115 @@ def _plan_pdf_pages(files: list[dict[str, Any]], *, per_pdf: int, total_max: int
         plans.append({"path": item["path"], "page_count": effective_pages, "pages": pages})
         remaining -= count
     return plans
+
+
+def _sample_observation(
+    item: Mapping[str, Any],
+    *,
+    tools: list[tool_cmd.DiscoveredTool],
+    cwd: Path,
+    home: Path,
+    logger,
+) -> str:
+    ext = str(item.get("ext") or "")
+    if ext != "pdf" and ext not in _IMAGE_EXTS and ext not in _OFFICE_EXTS:
+        return ""
+
+    abs_path = (cwd / str(item["path"])).resolve()
+    observations: list[str] = []
+    for tool in _sample_tools_for_ext(tools, ext):
+        try:
+            result = tool_cmd.run_tool(
+                tool.spec.name,
+                ["--path", str(abs_path)],
+                cwd=cwd,
+                home=home,
+                logger=logger,
+            )
+        except SystemExit as exc:
+            logger.warning("%s sample exited for %s: %s", tool.spec.name, item["path"], exc)
+            continue
+        except Exception as exc:
+            logger.warning("%s sample failed for %s: %s", tool.spec.name, item["path"], exc)
+            continue
+        observation = _observation_from_tool_result(tool.spec.name, result.value, result.kind)
+        if observation:
+            observations.append(observation)
+        if len(observations) >= 2:
+            break
+    if observations:
+        return "; ".join(observations)
+    return _observation_from_meta(item)
+
+
+def _sample_tools_for_ext(
+    tools: list[tool_cmd.DiscoveredTool],
+    ext: str,
+) -> list[tool_cmd.DiscoveredTool]:
+    candidates = [
+        item
+        for item in tools
+        if item.availability.available
+        and item.spec.cost in _SAMPLE_TOOL_COSTS
+        and item.spec.has_flag("path")
+        and _sample_tool_flags_are_satisfiable(item.spec)
+        and _sample_tool_matches_ext(item.spec.name, item.spec.scope, ext)
+    ]
+    return sorted(candidates, key=lambda item: (_COST_LEVELS.index(item.spec.cost), item.spec.name))
+
+
+def _sample_tool_flags_are_satisfiable(spec: tool_cmd.ToolSpec) -> bool:
+    return {_sample_flag_name(flag) for flag in spec.flags} <= {"path"}
+
+
+def _sample_flag_name(name: str) -> str:
+    return name.strip().lstrip("-").replace("_", "-")
+
+
+def _sample_tool_matches_ext(name: str, scope: str, ext: str) -> bool:
+    if scope == "previewer":
+        return _previewer_matches_ext(name, ext)
+    if ext == "pdf":
+        return "pdf" in name
+    if ext in _IMAGE_EXTS:
+        return name.startswith("img_") or "image" in name or "ocr" in name
+    if ext in _OFFICE_EXTS:
+        return "pandoc" in name or "office" in name or "doc" in name
+    return False
+
+
+def _observation_from_tool_result(name: str, value: Any, kind: str) -> str:
+    if kind == "binary":
+        return ""
+    if isinstance(value, str):
+        text = _clip_text(" ".join(value.split()), limit=220)
+        if not text:
+            return ""
+        return f"{name}: {text}"
+    if isinstance(value, Mapping):
+        flattened = ", ".join(
+            f"{key}={_clip_text(str(val), limit=60)}"
+            for key, val in sorted(value.items(), key=lambda item: str(item[0]))
+            if isinstance(val, (str, int, float, bool)) or val is None
+        )
+        if flattened:
+            return f"{name}: {flattened}"
+    return ""
+
+
+def _observation_from_meta(item: Mapping[str, Any]) -> str:
+    meta = _as_mapping(item.get("meta"))
+    pdf = _as_mapping(meta.get("pdf"))
+    if pdf:
+        return f"metadata: pages={int(pdf.get('page_count') or 0)}, words={int(pdf.get('word_count') or 0)}"
+    image = _as_mapping(meta.get("image"))
+    if image:
+        return f"metadata: image={int(image.get('width') or 0)}x{int(image.get('height') or 0)}"
+    return ""
+
+
+def _clip_text(text: str, *, limit: int) -> str:
+    text = text.strip()
+    if len(text) <= limit:
+        return text
+    return text[: max(0, limit - 3)].rstrip() + "..."

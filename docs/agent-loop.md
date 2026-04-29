@@ -2,13 +2,13 @@
 
 PennyParse agents declare their intended implementation mode with `_AGENT_IMPL_MODE`.
 
-- `agent/init_tools.py`: `pesudo_XML`
+- `agent/init_tools.py`: `pseudo_XML`
 - `agent/parser.py`: `tool_calls`
 - `agent/reviewer.py`: `tool_calls`
 
 ## Init Tools
 
-The user-tool generator accepts the pseudo-XML shape:
+The user-tool generator uses the `pseudo_XML` mode and accepts the pseudo-XML shape:
 
 ````text
 <full_file_code>
@@ -18,7 +18,7 @@ The user-tool generator accepts the pseudo-XML shape:
 </full_file_code>
 ````
 
-Repair turns feed validation failures back to the model. The extractor also accepts a bare fenced Python block for older responses.
+Repair turns feed validation failures back to the model. The extractor is exposed as `extract_pseudo_xml`; the old `extract_pesudo_xml` spelling remains as a compatibility alias. The extractor also accepts a bare fenced Python block for older responses.
 
 ## Parser And Reviewer
 
