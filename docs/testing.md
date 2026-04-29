@@ -20,6 +20,10 @@ The dynamic tests create temporary fake `cwd` and `HOME` directories, write a mi
 
 Parser tests use discovered demo assets and skip optional PDF assertions when the matching backend is not installed.
 
+Run-command tests keep the same temporary `cwd` and `HOME` pattern. They verify that `pennyparse run` refuses missing init files, appends parser batch notes without replacing existing memory, and appends final output statistics.
+
+Agent-loop tests use fake chat clients. They verify chat retry behavior, JSON tool-result feedback for tool exceptions, and `max_iter` termination without network calls.
+
 For end-to-end CLI checks that need chat settings, load `.env` into the command environment, for example:
 
 ```shell

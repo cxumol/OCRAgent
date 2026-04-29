@@ -9,7 +9,7 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from types import ModuleType
-from typing import Any, Callable, Iterable, Mapping
+from typing import Any, Callable, Iterable, Mapping, cast
 
 from ..config import get_user_toolbox_path
 from ..logger import get_logger
@@ -128,6 +128,13 @@ _BUILTIN_TOOL_SPECS: tuple[dict[str, Any], ...] = (
         "flags": {"path": "/path/to/file.pdf"},
     },
     {
+        "name": "pdf_pages_to_images",
+        "scope": "parser",
+        "cost": "medium",
+        "desc": "Render each PDF page to a PNG image with PyMuPDF.",
+        "flags": {"path": "/path/to/file.pdf", "out-dir": "/path/to/page-images"},
+    },
+    {
         "name": "pandoc2txt",
         "scope": "parser",
         "cost": "low",
@@ -138,6 +145,7 @@ _BUILTIN_TOOL_SPECS: tuple[dict[str, Any], ...] = (
 _BUILTIN_DEPENDENCIES = {
     "pdf_metadata": "pymupdf",
     "pdf2txt": "pymupdf",
+    "pdf_pages_to_images": "pymupdf",
     "pandoc2txt": "pypandoc",
 }
 
@@ -340,7 +348,7 @@ def load_user_specs(
         if not isinstance(item, Mapping):
             return [], f"user toolbox TOOL_SPECS[{index}] must be a mapping"
         try:
-            specs.append(ToolSpec.from_mapping(item))
+            specs.append(ToolSpec.from_mapping(cast(Mapping[str, Any], item)))
         except ValueError as exc:
             return [], f"user toolbox TOOL_SPECS[{index}] is invalid: {exc}"
     return specs, None
@@ -627,6 +635,7 @@ def _builtin_handler(name: str) -> Callable[[list[str]], Any]:
         "img_thumb": img_thumb,
         "pdf_metadata": pdf_metadata,
         "pdf2txt": pdf2txt,
+        "pdf_pages_to_images": pdf_pages_to_images,
         "pandoc2txt": pandoc2txt,
     }
     try:
@@ -713,6 +722,29 @@ def pdf2txt(argv: list[str]) -> str:
 
     with pymupdf.open(path) as document:
         return chr(12).join(page.get_text() for page in document)
+
+
+def pdf_pages_to_images(argv: list[str]) -> dict[str, Any]:
+    parser = argparse.ArgumentParser(prog="pennyparse tool pdf_pages_to_images", add_help=False)
+    parser.add_argument("--path", required=True)
+    parser.add_argument("--out-dir", required=True)
+    parser.add_argument("--zoom", type=float, default=2.0)
+    args = parser.parse_args(argv)
+    path = Path(args.path).expanduser().resolve()
+    out_dir = Path(args.out_dir).expanduser().resolve()
+
+    import pymupdf
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+    pages: list[dict[str, Any]] = []
+    with pymupdf.open(path) as document:
+        matrix = pymupdf.Matrix(args.zoom, args.zoom)
+        for index, page in enumerate(document, start=1):
+            image_path = out_dir / f"page-{index:04d}.png"
+            pixmap = page.get_pixmap(matrix=matrix, alpha=False)
+            pixmap.save(image_path)
+            pages.append({"page": index, "image_file": str(image_path)})
+    return {"source_file": str(path), "pages": pages}
 
 
 def pandoc2txt(argv: list[str]) -> str:

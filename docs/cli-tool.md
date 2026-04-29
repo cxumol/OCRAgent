@@ -60,6 +60,7 @@ Current builtin tools:
 - `img_thumb`
 - `pdf_metadata`
 - `pdf2txt`
+- `pdf_pages_to_images`
 - `pandoc2txt`
 
 The optional PDF and Pandoc tools remain listed even when their dependencies are missing. In that case, the list output and `pennyparse.log` include the unavailability reason.

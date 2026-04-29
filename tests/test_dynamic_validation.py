@@ -26,8 +26,11 @@ if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
 from pennyparse.cmd import init_docs, tool as tool_cmd  # noqa: E402
+from pennyparse.cmd import run as run_cmd  # noqa: E402
 from pennyparse.agent import parser as parser_agent  # noqa: E402
 from pennyparse.agent import reviewer as reviewer_agent  # noqa: E402
+from pennyparse._client import ChatSession  # noqa: E402
+from pennyparse import utils_aigc  # noqa: E402
 
 
 def _discover_demo_asset(suffixes: set[str]) -> Path:
@@ -68,6 +71,39 @@ def _write_fake_user_toolbox(home: Path) -> None:
     )
 
 
+def _write_fake_image_user_toolbox(home: Path) -> None:
+    toolbox = home / ".pennyparse" / "user_toolbox.py"
+    toolbox.parent.mkdir(parents=True, exist_ok=True)
+    toolbox.write_text(
+        "\n".join(
+            [
+                "import os",
+                "",
+                "TOOL_SPECS = [",
+                "    {",
+                "        'name': 'fake_ocr',",
+                "        'scope': 'parser',",
+                "        'cost': 'low',",
+                "        'desc': 'Fake image OCR test tool.',",
+                "        'flags': {'path': '/path/to/image.png'},",
+                "    },",
+                "]",
+                "UNAVAILABLE_TOOLS = {}",
+                "",
+                "def tool_fake_ocr(argv):",
+                "    path = argv[argv.index('--path') + 1]",
+                "    if path.lower().endswith('.pdf'):",
+                "        return ''",
+                "    return 'OCR ' + os.path.basename(path)",
+                "",
+                "TOOL_HANDLERS = {'fake_ocr': tool_fake_ocr}",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+
 def _write_fake_settings(home: Path) -> None:
     settings = home / ".pennyparse" / "pennyparse.settings.toml"
     settings.parent.mkdir(parents=True, exist_ok=True)
@@ -80,6 +116,19 @@ def _write_fake_settings(home: Path) -> None:
                 "[init.sampling]",
                 'by = "none"',
                 "num = 0",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+
+def _write_parser_batch_settings(cwd: Path, batch_size: int) -> None:
+    (cwd / "pennyparse.settings.toml").write_text(
+        "\n".join(
+            [
+                "[output]",
+                f"parser_summary_batch = {batch_size}",
                 "",
             ]
         ),
@@ -296,6 +345,94 @@ class ReviewerTests(unittest.TestCase):
         self.assertEqual(outcome.status, "major_revision")
         self.assertEqual(outcome.text, "complete parser text")
 
+    def test_reviewer_tool_patch_loop_targets_initial_text_each_turn(self) -> None:
+        with tempfile.TemporaryDirectory() as cwd_raw, tempfile.TemporaryDirectory() as home_raw:
+            tool_results: list[dict[str, object]] = []
+            testcase = self
+
+            class FakeChatClient:
+                def __init__(self, **kwargs):
+                    self.calls = 0
+
+                def __enter__(self):
+                    return self
+
+                def __exit__(self, exc_type, exc_value, traceback):
+                    pass
+
+                def complete(self, session, **kwargs):
+                    self.calls += 1
+                    if self.calls == 1:
+                        return {
+                            "role": "assistant",
+                            "content": None,
+                            "tool_calls": [
+                                {
+                                    "id": "call_1",
+                                    "type": "function",
+                                    "function": {
+                                        "name": "myregexpatch",
+                                        "arguments": json.dumps(
+                                            {
+                                                "message": "first patch",
+                                                "before_len": 2,
+                                                "after_len": 2,
+                                                "patches": [{"pattern": "a", "repl": "b"}],
+                                            }
+                                        ),
+                                    },
+                                }
+                            ],
+                        }
+                    if self.calls == 2:
+                        payload = json.loads(session.messages[-1]["content"])
+                        tool_results.append(payload)
+                        testcase.assertNotIn("revised", payload)
+                        return {
+                            "role": "assistant",
+                            "content": None,
+                            "tool_calls": [
+                                {
+                                    "id": "call_2",
+                                    "type": "function",
+                                    "function": {
+                                        "name": "myregexpatch",
+                                        "arguments": json.dumps(
+                                            {
+                                                "message": "second patch",
+                                                "before_len": 2,
+                                                "after_len": 2,
+                                                "patches": [{"pattern": "a", "repl": "c"}],
+                                            }
+                                        ),
+                                    },
+                                }
+                            ],
+                        }
+                    payload = json.loads(session.messages[-1]["content"])
+                    tool_results.append(payload)
+                    return {
+                        "role": "assistant",
+                        "content": json.dumps(
+                            {"status": "minor_revision", "message": "accept patch"}
+                        ),
+                    }
+
+            with (
+                mock.patch.dict(os.environ, {"PENNYPARSE_CHAT_MODEL": "unit-test-model"}),
+                mock.patch("pennyparse.agent.reviewer.ChatClient", FakeChatClient),
+            ):
+                outcome = reviewer_agent.review_text(
+                    "aa",
+                    cwd=Path(cwd_raw),
+                    home=Path(home_raw),
+                )
+
+        self.assertEqual(outcome.status, "minor_revision")
+        self.assertEqual(outcome.text, "cc")
+        self.assertTrue(all(item["ok"] for item in tool_results))
+        self.assertEqual(tool_results[-1]["replacement_count"], 2)
+
 
 class ParserTests(unittest.TestCase):
     def test_cost_baseline_reads_natural_language_memory(self) -> None:
@@ -337,6 +474,195 @@ class ParserTests(unittest.TestCase):
             self.assertTrue(output_file.exists())
             self.assertEqual(output_file.name, "sample.txt.txt")
             self.assertEqual(output_file.read_text(encoding="utf-8"), "parsed body\n")
+
+    def test_parse_pdf_falls_back_to_page_images_and_merges_output(self) -> None:
+        if importlib.util.find_spec("pymupdf") is None:
+            self.skipTest("pymupdf is not installed")
+
+        import pymupdf
+
+        with tempfile.TemporaryDirectory() as cwd_raw, tempfile.TemporaryDirectory() as home_raw:
+            cwd = Path(cwd_raw)
+            home = Path(home_raw)
+            _write_fake_image_user_toolbox(home)
+
+            source = cwd / "blank.pdf"
+            document = pymupdf.open()
+            document.new_page(width=72, height=72)
+            document.new_page(width=72, height=72)
+            document.save(source)
+            document.close()
+
+            with mock.patch.dict(os.environ, {key: "" for key in CHAT_ENV_KEYS}):
+                result = parser_agent.parse_path(
+                    source,
+                    cwd=cwd,
+                    home=home,
+                    out_dir=cwd / "out",
+                )
+
+            output_file = Path(result.output_file)
+            output_text = output_file.read_text(encoding="utf-8")
+            page_dir = cwd / "out" / ".pennyparse_pages" / "blank.pdf"
+
+            self.assertTrue(result.ok)
+            self.assertTrue(result.tool.startswith("pdf_pages_to_images"))
+            self.assertEqual(output_file.name, "blank.pdf.txt")
+            self.assertTrue((page_dir / "page-0001.png").exists())
+            self.assertTrue((page_dir / "page-0002.png").exists())
+            self.assertIn("## Page 1", output_text)
+            self.assertIn("OCR page-0001.png", output_text)
+            self.assertIn("## Page 2", output_text)
+            self.assertIn("OCR page-0002.png", output_text)
+
+
+class RunCommandTests(unittest.TestCase):
+    def test_run_requires_init_files(self) -> None:
+        with tempfile.TemporaryDirectory() as cwd_raw, tempfile.TemporaryDirectory() as home_raw:
+            with self.assertRaisesRegex(RuntimeError, "init tools"):
+                run_cmd.run(cwd=Path(cwd_raw), home=Path(home_raw))
+
+            _write_fake_user_toolbox(Path(home_raw))
+            with self.assertRaisesRegex(RuntimeError, "init docs"):
+                run_cmd.run(cwd=Path(cwd_raw), home=Path(home_raw))
+
+    def test_run_appends_batch_and_final_memory_summaries(self) -> None:
+        with tempfile.TemporaryDirectory() as cwd_raw, tempfile.TemporaryDirectory() as home_raw:
+            cwd = Path(cwd_raw)
+            home = Path(home_raw)
+            _write_fake_user_toolbox(home)
+            _write_parser_batch_settings(cwd, 1)
+            memory_path = cwd / ".pennyparse_memory.txt"
+            memory_path.write_text("initial memory\n", encoding="utf-8")
+            first = cwd / "a.txt"
+            second = cwd / "b.txt"
+            first.write_text("alpha\n", encoding="utf-8")
+            second.write_text("beta\n", encoding="utf-8")
+
+            with mock.patch.dict(os.environ, {key: "" for key in CHAT_ENV_KEYS}):
+                summary = run_cmd.run(
+                    paths=[first, second],
+                    out_dir=cwd / "out",
+                    cwd=cwd,
+                    home=home,
+                )
+
+            memory = memory_path.read_text(encoding="utf-8")
+            self.assertTrue(summary["ok"])
+            self.assertEqual(summary["parsed_count"], 2)
+            self.assertEqual(summary["output_stats"]["file_count"], 2)
+            self.assertTrue(memory.startswith("initial memory\n"))
+            self.assertIn("a.txt等1份:fake_tool", memory)
+            self.assertIn("b.txt等1份:fake_tool", memory)
+            self.assertIn("Run summary: parsed 2, failed 0, output 2 file(s)", memory)
+
+
+class ToolCallsLoopTests(unittest.TestCase):
+    def test_tool_calls_loop_returns_tool_exception_to_model(self) -> None:
+        session = ChatSession()
+        session.user("run")
+
+        class FakeClient:
+            def __init__(self) -> None:
+                self.calls = 0
+
+            def complete(self, session, **kwargs):
+                self.calls += 1
+                if self.calls == 1:
+                    message = {
+                        "role": "assistant",
+                        "content": None,
+                        "tool_calls": [
+                            {
+                                "id": "call_1",
+                                "type": "function",
+                                "function": {"name": "broken", "arguments": "{\"x\": 1}"},
+                            }
+                        ],
+                    }
+                else:
+                    message = {"role": "assistant", "content": "done"}
+                session.messages.append(message)
+                return message
+
+        def broken(args):
+            raise ValueError(f"bad {args['x']}")
+
+        result = utils_aigc.run_tool_calls_loop(
+            FakeClient(),
+            session,
+            tools=[],
+            tool_handlers={"broken": broken},
+            max_iter=2,
+            max_retry=1,
+        )
+
+        tool_message = session.messages[-2]
+        tool_payload = json.loads(tool_message["content"])
+        self.assertEqual(result["content"], "done")
+        self.assertEqual(tool_message["role"], "tool")
+        self.assertFalse(tool_payload["ok"])
+        self.assertEqual(tool_payload["error"]["type"], "ValueError")
+
+    def test_tool_calls_loop_retries_chat_completion(self) -> None:
+        session = ChatSession()
+        session.user("hello")
+
+        class FakeClient:
+            def __init__(self) -> None:
+                self.calls = 0
+
+            def complete(self, session, **kwargs):
+                self.calls += 1
+                if self.calls == 1:
+                    raise RuntimeError("temporary")
+                message = {"role": "assistant", "content": "ok"}
+                session.messages.append(message)
+                return message
+
+        client = FakeClient()
+        with mock.patch("pennyparse.utils_aigc.time.sleep"):
+            result = utils_aigc.run_tool_calls_loop(
+                client,
+                session,
+                tools=[],
+                tool_handlers={},
+                max_iter=1,
+                max_retry=2,
+            )
+
+        self.assertEqual(result["content"], "ok")
+        self.assertEqual(client.calls, 2)
+
+    def test_tool_calls_loop_stops_at_max_iter(self) -> None:
+        session = ChatSession()
+        session.user("loop")
+
+        class FakeClient:
+            def complete(self, session, **kwargs):
+                message = {
+                    "role": "assistant",
+                    "content": None,
+                    "tool_calls": [
+                        {
+                            "id": "call_1",
+                            "type": "function",
+                            "function": {"name": "noop", "arguments": "{}"},
+                        }
+                    ],
+                }
+                session.messages.append(message)
+                return message
+
+        with self.assertRaisesRegex(RuntimeError, "max_iter=1"):
+            utils_aigc.run_tool_calls_loop(
+                FakeClient(),
+                session,
+                tools=[],
+                tool_handlers={"noop": lambda args: "again"},
+                max_iter=1,
+                max_retry=1,
+            )
 
 
 if __name__ == "__main__":
