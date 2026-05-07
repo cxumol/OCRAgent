@@ -10,6 +10,18 @@ Use the locked project environment:
 uv run pennyparse --help
 ```
 
+<details>
+<summary>Prefer pip?</summary>
+
+```shell
+python -m venv .venv
+. .venv/bin/activate
+python -m pip install -e ".[pdf,docx]"
+pennyparse --help
+```
+
+</details>
+
 Enable optional backends only when a task needs them:
 
 ```shell
@@ -62,6 +74,32 @@ tests/e2e.sh -d _test_playground
 
 The script uses the chosen directory as both `HOME` and `cwd`, copies test inputs, runs the real CLI flow, and prints commands, exit codes, generated memory, output previews, and log tails.
 It copies repository-local runtime inputs when present: `.env`, `pennyparse.settings.toml`, `.pennyparse/pennyparse.settings.toml`, `pennyparse.toolbox_user.txt`, and files under `demo_assets/`.
+
+## Release To PyPI
+
+The release workflow is `.github/workflows/publish-pypi.yml`. It builds with `uv build` and uploads with `uv publish`.
+
+Use PyPI Trusted Publishing for the project. In PyPI, add a trusted publisher for this repository, workflow `publish-pypi.yml`, and environment `pypi`. No PyPI token is needed in GitHub secrets.
+
+Release from a version tag:
+
+```shell
+uv lock
+uv build
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+<details>
+<summary>Prefer pip build tools?</summary>
+
+```shell
+python -m pip install build twine
+python -m build
+python -m twine check dist/*
+```
+
+</details>
 
 ## Development Rules
 

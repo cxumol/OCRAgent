@@ -4,11 +4,22 @@ PennyParse 会把一个目录里的混合文档解析成文本文件。推荐流
 
 ## 安装与配置
 
-在项目环境中运行：
+从 PyPI 安装 PennyParse：
 
 ```shell
-uv run pennyparse --help
+python -m pip install pennyparse
+pennyparse --help
 ```
+
+<details>
+<summary>偏好 uv？</summary>
+
+```shell
+uv tool install pennyparse
+pennyparse --help
+```
+
+</details>
 
 需要 LLM 支持的初始化命令时，配置一个兼容 OpenAI chat-completions 的端点：
 
@@ -23,8 +34,8 @@ export PENNYPARSE_CHAT_AUTHKEY=your-key
 可选文档后端：
 
 ```shell
-uv run --extra pdf pennyparse tool --list
-uv run --extra docx pennyparse tool --list
+python -m pip install "pennyparse[pdf]"
+python -m pip install "pennyparse[docx]"
 ```
 
 ## 准备用户工具

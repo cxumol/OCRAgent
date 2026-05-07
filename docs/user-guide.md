@@ -4,11 +4,22 @@ PennyParse parses a folder of documents into text files. It works best when you 
 
 ## Install And Configure
 
-Use the project environment:
+Install PennyParse from PyPI:
 
 ```shell
-uv run pennyparse --help
+python -m pip install pennyparse
+pennyparse --help
 ```
+
+<details>
+<summary>Prefer uv?</summary>
+
+```shell
+uv tool install pennyparse
+pennyparse --help
+```
+
+</details>
 
 Configure an OpenAI-compatible chat-completions endpoint when you need LLM-backed initialization:
 
@@ -23,8 +34,8 @@ export PENNYPARSE_CHAT_AUTHKEY=your-key
 Optional document backends:
 
 ```shell
-uv run --extra pdf pennyparse tool --list
-uv run --extra docx pennyparse tool --list
+python -m pip install "pennyparse[pdf]"
+python -m pip install "pennyparse[docx]"
 ```
 
 ## Prepare User Tools
