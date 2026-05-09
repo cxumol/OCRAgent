@@ -132,23 +132,11 @@ That memory is plain prose. It helps later parser runs choose a sensible startin
 ## Architecture
 
 ```text
-              CLI
-               |
-     config, logging, paths
-               |
-        deterministic commands
-               |
-   +-----------+-----------+
-   |                       |
- tools                  agents
-   |                       |
- local parsers       plan, choose, review
- OCR / VLM / APIs        |
-   +-----------+-----------+
-               |
-          reviewed text
-               |
-        pennyparse_results/
+CLI  （pennyparse init / run / tool）
+ │
+AI Agents  （init_tools / parser / reviewer）
+ │
+Tool chain  （builtin tools + user_toolbox.py）
 ```
 
 ![Detailed architecture diagram placeholder](docs/assets/readme-detailed-architecture.png)
@@ -355,26 +343,14 @@ scans/page-01.jpg -> pennyparse_results/scans/page-01.jpg.md
 ## 三层架构概览
 
 ```text
-              CLI
-               |
-      配置、日志、路径
-               |
-        确定性的命令层
-               |
-   +-----------+-----------+
-   |                       |
- 工具层                  Agent 层
-   |                       |
- 本地解析器            规划、选择、审阅
- OCR / VLM / API          |
-   +-----------+-----------+
-               |
-          审阅后的文本
-               |
-        pennyparse_results/
+命令行  （pennyparse init / run / tool）
+ │
+AI Agents 智能体  （init_tools / parser / reviewer）
+ │
+工具链  （builtin tools + user_toolbox.py）
 ```
 
-![详细架构图占位](docs/assets/readme-detailed-architecture.png)
+![详细架构图](docs/assets/readme-detailed-architecture.png)
 
 | 层次 | 负责 | 例子 |
 | --- | --- | --- |
