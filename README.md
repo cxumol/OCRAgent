@@ -4,9 +4,9 @@
 
 ![Brand banner](docs/assets/readme-brand-banner.png)
 
-PennyParse turns a folder of mixed, messy documents into clean UTF-8 text. It is built for the files that break ordinary extraction: scanned PDFs, photos of paper, handwritten pages, low-quality copies, tables, charts, and folders where easy and hard documents sit side by side.
+PennyParse turns a folder of mixed, unruly documents into clean UTF-8 text. It is built for the files that break ordinary extraction: scanned PDFs, photos of paper, handwritten pages, low-quality copies, tables, charts, and folders where easy and hard documents sit side by side.
 
-The idea is simple: spend the cheapest useful effort first, then escalate only when the document earns it.
+Its bet is simple: document parsing should be routed, reviewed, and priced like a workflow. Use cheap local extraction when it is enough. Escalate only when the page asks for it.
 
 ![PennyParse logo](docs/assets/readme-logo.png)
 
@@ -16,15 +16,21 @@ The idea is simple: spend the cheapest useful effort first, then escalate only w
 
 ## Why PennyParse
 
-Most document parsers make you choose one backend up front. That works for a tidy folder. It wastes money on easy files and fails quietly on hard ones.
+Most document parsers make you choose one backend up front. That is a poor fit for real folders. Tesseract OCR can be the right tool for plain printed pages, but it cannot reliably handle decorative type, rare characters, and degraded scans. A top multimodal LLM can read many clean scanned novels beautifully, but sending every readable page to it wastes compute, time, and money.
+
+PennyParse is built around graded parsing. A cheap parser gets the first try when the document looks easy. Costlier OCR, VLMs, and cloud APIs enter when the content needs them. The point is resource allocation with judgment.
+
+The same logic applies among multimodal models. One model may be stronger on handwriting. Another may preserve mathematical formulas better. Another may handle tables or mixed-language pages with fewer scars. PennyParse gives an agent enough context to assign work by page character instead of treating every model as interchangeable.
 
 PennyParse treats parsing as an adaptive workflow:
 
 - It previews a folder before parsing it.
 - It records a short natural-language memory for that folder.
 - It chooses parser tools by file difficulty and previous results.
-- It reviews extracted text before writing final output.
+- It reviews extracted text before writing final output, even when the reviewer is text-only.
 - It lets you plug in local tools, OCR services, VLMs, or cloud APIs through a small tool contract.
+
+The review step matters. A text-only LLM cannot see the page, but it can still catch broken prose, duplicated headers, table drift, missing paragraphs, and layout damage that makes the result read wrong. That turns parsing from a single blind shot into an agentic loop with a second opinion.
 
 ![Core value comparison](docs/assets/readme-core-value-comparison.png)
 
@@ -149,7 +155,7 @@ PennyParse has three working planes:
 | Tool plane | Extraction capability | PDF text, image thumbnails, Pandoc, user OCR, VLM APIs |
 | Agent plane | Judgment under uncertainty | grouping files, choosing tools, reviewing extracted text |
 
-The parser never calls vendors directly. It asks the tool registry what is available, runs a parser through the same boundary as the CLI, and sends the candidate text to review before writing output.
+The parser never calls vendors directly. It asks the tool registry what is available, runs a parser through the same boundary as the CLI, and sends candidate text to review before writing output. When the review fails, the agent can retry with another tool or a higher-cost route, guided by folder memory and the last failure.
 
 ## Configuration
 
@@ -223,19 +229,25 @@ PennyParse is pre-alpha. The command shape is usable, and breaking changes are s
 
 ## 为什么是 PennyParse
 
-PennyParse 把一个目录里的混合文档解析成干净的 UTF-8 文本。它面向普通解析工具容易失手的材料：扫描 PDF、纸本文档照片、手写稿、模糊影印件、表格、图表，以及同一目录中难度参差不齐的文件。
+PennyParse 做一件细事：把一篮子性情不同的文档，慢慢理成干净的 UTF-8 文本。扫描 PDF、纸页照片、手写稿、影印本、表格、图表，许多寻常工具一见便手生；同在一个目录里，浅的浅，深的深，尤其如此。
 
-它的核心思路很直接：先用足够便宜的办法处理简单文件，只有确实需要时才升级到更贵的 OCR、VLM 或云端 API。
+它的意思很朴素：容易的页，先请便宜的工具去读；读不动了，再请更贵的 OCR、VLM 或云端 API。算力如灯油，明处不必添灯，暗处才该多照一照。
 
-大多数文档解析器要求你预先选定一个后端。文件整齐时这很好用；文件复杂时，要么浪费成本，要么静默失败。
+许多解析器要人一开始便选定后端。目录清爽时，这样也成；文档一杂，便难免两头落空。Tesseract OCR 遇见普通印刷页，往往够用；碰到艺术字型、生僻字符、磨损扫描件，便真是搞不定。顶级多模态 LLM 读多数扫描清晰的出版小说，自然从容；可每一页都这样送去读，花费的算力、时间与钱，都显得过满。
+
+PennyParse 因此把解析做成分级流程。文档看着容易，低成本工具先试；内容显出难处，再交给更强的 OCR、VLM 或云端 API。分级解析才是正道：让合适的能力去做合适的事。
+
+多模态模型之间也各有心性。甲也许更会认手写，乙也许更会守住数学公式，丙也许处理表格和中英混排更清爽。PennyParse 让 Agent 先看材料，再分派任务，不把所有模型都看成一把尺子。
 
 PennyParse 把解析变成一个自适应流程：
 
 - 先预览整个目录，再开始解析。
 - 为目录写一份自然语言解析记忆。
 - 根据文件难度和前序结果选择解析工具。
-- 在写入最终结果前审阅抽取文本。
-- 通过小而清晰的工具契约接入本地工具、OCR 服务、VLM 或云端 API。
+- 在写入最终结果前审阅抽取文本，审阅者即使没有视觉能力，也仍有用处。
+- 通过小而清晰的工具接口约定接入本地工具、OCR 服务、VLM 或云端 API。
+
+Agentic Loop 的好处，正在这一次回看。纯文本 LLM 看不见原页，却能听出句子是否顺，标题是否重，表格是否漂移，段落是否少了一截。解析不再是一锤子买卖，而有校对，有改道，有第二眼。
 
 ![核心价值对比图](docs/assets/readme-core-value-comparison.png)
 
@@ -358,7 +370,7 @@ AI Agents 智能体  （init_tools / parser / reviewer）
 | 工具层 | 解析能力 | PDF 文本、图像缩略图、Pandoc、用户 OCR、VLM API |
 | Agent 层 | 不确定场景下的判断 | 文件分组、工具选择、抽取结果审阅 |
 
-解析器不会直接调用厂商服务。它先询问工具注册表有哪些工具可用，再通过与 CLI 相同的边界运行工具，候选文本通过审阅后才写入输出目录。
+解析器不直接拨打厂商服务。它先问工具注册表：此地有什么可用；再沿着与 CLI 相同的边界运行工具。候选文本须经审阅，才写入输出目录。若审阅不过，Agent 会参考目录记忆和上一次失败，另择工具，或把成本往上提一级。
 
 ## 配置
 
@@ -409,7 +421,7 @@ uv run --extra pdf python -m unittest discover -s tests
 
 - `src/pennyparse/cli.py`：命令边界。
 - `src/pennyparse/cmd/`：命令实现。
-- `src/pennyparse/cmd/tool.py`：内建和用户工具契约。
+- `src/pennyparse/cmd/tool.py`：内建和用户工具接口约定。
 - `src/pennyparse/agent/`：面向模型的循环。
 - `src/pennyparse/config.py`：分层配置。
 - `tests/`：当前测试套件和 CLI 流程检查。
@@ -424,4 +436,4 @@ uv run --extra pdf python -m unittest discover -s tests
 
 ## 项目状态
 
-PennyParse 处于 pre-alpha 阶段。命令形态已经可用，后续仍可能发生破坏性变更。项目欢迎关心文档解析、本地优先工具和边界清晰的 Agent 工作流的贡献者。
+PennyParse 处于 pre-alpha 阶段。命令形态已经可用，后续仍可能有破坏性变更。若你也关心文档解析、本地优先工具、边界清楚的 Agent 工作流，此时加入，正好能改到根上。

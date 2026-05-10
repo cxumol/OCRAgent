@@ -1,6 +1,8 @@
 # Agent Loop
 
-PennyParse uses agents where the input space is too open for durable rules and where a deterministic validator can still close the loop. The agent is allowed to propose; code decides whether the proposal becomes state.
+PennyParse uses agents where the input space is too open for durable rules and where a deterministic validator can still close the loop. The agent may propose; code decides whether the proposal becomes state.
+
+The loop exists because document parsing needs more than a first pass. A cheap extractor may be enough. A page image may need OCR. A handwritten note, a formula sheet, and a table scan may each call for a different model. After extraction, even a text-only reviewer can catch prose that no longer reads, headings that repeat, tables that drift, and paragraphs that disappear.
 
 ## Responsibility Split
 
@@ -8,7 +10,7 @@ The system has four model-facing responsibilities.
 
 `init_tools` turns user-authored toolbox prose into a Python runtime module. This is agent work because the source may describe local commands, HTTP APIs, credentials, and quirks in many styles. A rules engine would either reject useful prose or grow into a weak code generator.
 
-`init docs` groups a local folder and writes `.pennyparse_memory.txt`. This is model work because filenames, preview metadata, and parsing difficulty are weak signals. The output is prose so later code can treat it as guidance rather than a hidden schema.
+`init docs` groups a local folder and writes `.pennyparse_memory.txt`. This is model work because filenames, preview metadata, and parsing difficulty are weak signals. The output is prose so later code can treat it as guidance.
 
 `parser` is an agent-shaped controller around deterministic tool execution. Today the first-order candidate ranking is deterministic: availability, scope, flags, extension fit, and cost baseline decide the order. The agent boundary is still useful because real documents are uneven and later policy can use the same tool-call contract without changing filesystem ownership.
 
@@ -18,7 +20,7 @@ The system has four model-facing responsibilities.
 
 Fixed code is good at contracts: walking files, loading settings, checking dependencies, ranking obvious tool candidates, routing stdout, importing generated modules, applying regex, and writing output. It is weak at interpreting informal tool descriptions, grouping unfamiliar folders, and judging whether an extraction is plausible.
 
-PennyParse therefore keeps uncertainty at the top and enforcement at the bottom. The model sees enough context to make a judgment. The program owns all effects.
+PennyParse keeps uncertainty at the top and enforcement at the bottom. The model sees enough context to make a judgment. The program owns all effects.
 
 ## Implementation Modes
 
@@ -54,11 +56,11 @@ State machine:
 6. If validation fails, feed the concrete failures back as the next user message.
 7. Stop when validation passes or `[aigc.agent].max_iter` is reached.
 
-Result checks are validation targets, not repair instructions. They can report execution failures, output excerpts, or parser-quality issues. The model decides which part of `user_toolbox.py` to change: metadata, argument handling, request construction, prompt text, response parsing, cleanup, or availability.
+Result checks are validation targets. They can report execution failures, output excerpts, or parser-quality issues. The model decides which part of `user_toolbox.py` to change: metadata, argument handling, request construction, prompt text, response parsing, cleanup, or availability.
 
 If the chat request itself fails before a module is produced, `init_tools` writes an importable fallback toolbox from conservative names inferred from the toolbox TXT. Those generated user tools are marked unavailable with the request failure reason, so `init docs` and local parsers can continue with builtin tools while preserving why the requested remote tools cannot run.
 
-The prompt asks for a full replacement on each repair turn. This keeps the generated module coherent and avoids patch stacking.
+The prompt asks for a full replacement on each repair turn. This keeps the generated module coherent.
 
 ## Tool-Call Loop
 
@@ -101,13 +103,15 @@ The reviewer returns one normalized status:
 
 Empty text is always `major_revision`. Without a configured model, non-empty text passes locally. With a model, only a bounded prefix is sent for audit; accepted output still uses the complete original text unless a valid repair is applied.
 
+The reviewer does not need vision to be useful. It judges the text it receives: fluency, obvious omissions, repeated boilerplate, broken ordering, and layout damage. That review signal is enough to make the parser try a better route.
+
 The reviewer exposes one repair tool: `myregexpatch`. It accepts `before_len`, `after_len`, and a chain of `re.sub` patches. The program applies the chain to the initial full parser text and returns only an audit summary: status, patch count, replacement count, and lengths.
 
 Every repair call is evaluated against the same initial text. Later turns do not patch the previous patched result. This keeps repairs reproducible and prevents accidental compounding.
 
 ## Cybernetic Boundary
 
-The cybernetic part is the feedback loop: observe a file set or parser result, act through a tool or code proposal, validate the effect, then feed the validation signal back. The boundary is the validator.
+The feedback loop is simple: observe a file set or parser result, act through a tool or code proposal, validate the effect, then feed the validation signal back. The boundary is the validator.
 
 Inside the boundary, the agent may revise its judgment. Outside it, deterministic code owns side effects:
 
@@ -117,7 +121,7 @@ Inside the boundary, the agent may revise its judgment. Outside it, deterministi
 - reviewer repairs are program-applied regex chains;
 - output files are written only after review accepts.
 
-This gives the system adaptation without letting adaptation erase accountability.
+This gives the system adaptation while preserving accountability.
 
 ## Notes For Changes
 

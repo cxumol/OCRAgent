@@ -1,6 +1,8 @@
 # Architecture
 
-PennyParse turns a folder of mixed documents into stable text output. Its design is deliberately small: deterministic code owns the filesystem, configuration, tool contracts, and validation; agents make the few choices where a document set or extraction result is too varied for fixed rules.
+PennyParse turns a mixed document folder into stable text output. Its design is deliberately small: deterministic code owns files, configuration, tool contracts, and validation; agents make the few choices where a folder or extraction result is too varied for fixed rules.
+
+The core design pressure is graded parsing. Tesseract may be enough for plain print and inadequate for decorative type or rare characters. A top multimodal LLM may be excellent for a clean scan and wasteful for a page with an embedded text layer. The architecture exists to route work before spending compute, then review the text before it becomes output.
 
 The system has four layers.
 
@@ -8,7 +10,7 @@ The system has four layers.
 
 The CLI is the public boundary. `pennyparse init`, `pennyparse tool`, and `pennyparse run` resolve configuration, set up logging, and hand work to command modules. The CLI keeps a strict stream contract: command results go to `stdout`; logs and human messages go to `stderr`; the full runtime log goes to `pennyparse.log`.
 
-This boundary matters because tools may return text, JSON, or bytes. A parser can compose them only if business output is never mixed with progress output.
+This boundary matters because tools may return text, JSON, or bytes. Parsers can compose tools only when business output is never mixed with progress output.
 
 ## Local State
 
@@ -29,11 +31,11 @@ The three scopes express intent:
 - `parser`: extraction tools that turn a source file into candidate text.
 - `reviewer`: repair or audit helpers used by review agents.
 
-The parser never reaches directly into vendor APIs. It asks the tool registry what is available, chooses a candidate, runs it through the same execution path as the CLI, and reviews the result.
+The parser never reaches directly into vendor APIs. It asks the tool registry what is available, chooses a candidate, runs it through the same execution path as the CLI, and reviews the result before accepting it.
 
 ## Agent Plane
 
-Agents sit above tools, not beside them. They do not own filesystem mutation except where their output is immediately validated by deterministic code.
+Agents sit above tools, not beside them. They do not own filesystem mutation except where deterministic code immediately validates their output.
 
 There are four current model-facing jobs:
 
@@ -42,7 +44,7 @@ There are four current model-facing jobs:
 - Orchestrate parsing through an agent-shaped boundary while deterministic code ranks first-order candidates.
 - Review extracted text and propose bounded repairs.
 
-The division is intentional. Tool generation is open-ended code synthesis. Folder initialization needs judgment over loose filenames and preview signals. Review needs judgment about extraction quality. Parser execution still runs through ordinary tool calls and deterministic output ownership. File walking, config precedence, command syntax, output paths, dependency checks, and runtime validation stay deterministic.
+The division is intentional. Tool generation is open-ended code synthesis. Folder initialization needs judgment over loose filenames and preview signals. Review needs judgment about whether text reads like a faithful extraction. Parser execution still runs through ordinary tool calls and deterministic output ownership. File walking, config precedence, command syntax, output paths, dependency checks, and runtime validation stay deterministic.
 
 ## Parse Lifecycle
 
@@ -52,7 +54,7 @@ A normal run follows this path:
 2. `pennyparse init docs` scans the working directory, enriches files with cheap previews, groups them by parsing difficulty, and writes folder memory.
 3. `pennyparse run` resolves targets, parses them in batches, reviews each result, writes output files, and appends compact run memory.
 
-PDF handling shows the architecture in miniature. The parser first tries cheap text extraction. If review fails and PDF image fallback is available, it renders pages to images, parses those page images, merges the page text, and reviews the merged result. The fallback is bounded to one layer so the system can recover from scanned PDFs without becoming an unbounded planning engine.
+PDF handling shows the architecture in miniature. The parser first tries cheap text extraction. If review fails and PDF image fallback is available, it renders pages to images, parses those page images, merges the page text, and reviews the merged result. The fallback is bounded to one layer so the system can recover from scanned PDFs without turning a parse run into open-ended planning.
 
 ## Configuration
 
@@ -62,7 +64,7 @@ The default chat base is local. PennyParse therefore runs well in a lightweight 
 
 ## Design Pressure
 
-The project is optimized for traceable automation rather than maximal autonomy. Every place where the model acts has a contract around it:
+The project is optimized for traceable automation. Every place where the model acts has a contract around it:
 
 - generated code is imported and validated before use;
 - tool calls return structured audit data;
@@ -70,4 +72,4 @@ The project is optimized for traceable automation rather than maximal autonomy. 
 - parser output is written only after review accepts it;
 - generated memory is prose, not an implicit database.
 
-This keeps the agent useful without letting it become the architecture.
+This lets the agent exercise judgment while the architecture stays legible.

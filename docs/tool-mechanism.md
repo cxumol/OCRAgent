@@ -1,6 +1,6 @@
 # Tool Mechanism
 
-Tools are PennyParse's execution contract. They hide local binaries, Python libraries, and remote APIs behind one CLI-shaped interface, so agents can reason about capabilities without knowing each backend.
+Tools are PennyParse's execution contract. They put local binaries, Python libraries, and remote APIs behind one CLI-shaped interface, so agents can reason about capability, cost, and scope without knowing each backend.
 
 ## Public Commands
 
@@ -28,7 +28,7 @@ Every tool has a small manifest.
 }
 ```
 
-`scope` tells the system when to consider a tool. `cost` gives the parser and initializer a cheap way to prefer low-friction tools before expensive ones. `secrets` names environment variables that must exist before the tool is considered available.
+`scope` tells the system when to consider a tool. `cost` lets the parser and initializer try low-friction tools before expensive ones. `secrets` names environment variables that must exist before the tool is considered available.
 
 ## Handler Contract
 
@@ -54,11 +54,11 @@ The builtin set covers low-cost inspection and common document parsing:
 - `pdf_pages_to_images`: PDF page rendering.
 - `pandoc2txt`: Office document conversion.
 
-Optional dependencies affect availability, not discovery. A missing PDF or Pandoc backend makes the affected tool unavailable with a reason; it does not remove the tool from the conceptual model.
+Optional dependencies affect availability, not discovery. A missing PDF or Pandoc backend makes the affected tool unavailable with a reason; it does not remove the tool from the model the parser can reason about.
 
 ## Generated User Tools
 
-User tools start as prose in `pennyparse.toolbox_user.txt`. The prose should state concrete facts: tool names, scopes, costs, required environment variables, flags, command shapes, API calls, and caveats.
+User tools start as prose in `pennyparse.toolbox_user.txt`. The prose should state concrete facts: tool names, scopes, costs, strengths, limits, required environment variables, flags, command shapes, API calls, and caveats.
 
 `pennyparse init tools` asks the tool-generation agent to write `${HOME}/.pennyparse/user_toolbox.py`. The generated module must expose:
 
@@ -80,7 +80,7 @@ A tool is available when all of these are true:
 - its handler exists and is callable;
 - it is not explicitly disabled.
 
-Parser selection only considers available `scope = "parser"` tools that accept `--path`. Preview sampling only considers available previewers or cheap path-based parsers.
+Parser selection only considers available `scope = "parser"` tools that accept `--path`. Preview sampling only considers available previewers or cheap path-based parsers. Cost is advisory, but it matters: a plain text layer should not take the same path as handwriting, formulas, or decorative type.
 
 ## Example User Tool
 

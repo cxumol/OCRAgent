@@ -1,6 +1,8 @@
 # 用户指南
 
-PennyParse 会把一个目录里的混合文档解析成文本文件。推荐流程是：先生成工具运行时，再初始化文档目录，最后执行解析。
+PennyParse 把一个目录里的杂文档，理成可读、可检索、可再处理的 UTF-8 文本。推荐走法很清楚：先准备工具，再让它看一遍目录，最后开始解析。
+
+它不急着把每一页都交给最贵的模型。普通文字层、清爽扫描页、手写稿、公式、表格，各有各的读法；先用便宜办法探路，读不动处再添算力。
 
 ## 安装与配置
 
@@ -21,7 +23,7 @@ pennyparse --help
 
 </details>
 
-需要 LLM 支持的初始化命令时，配置一个兼容 OpenAI chat-completions 的端点：
+需要 LLM 帮忙做初始化时，配置一个兼容 OpenAI chat-completions 的端点：
 
 ```shell
 export PENNYPARSE_CHAT_BASE=http://localhost:8080/v1
@@ -29,7 +31,7 @@ export PENNYPARSE_CHAT_MODEL=your-model
 export PENNYPARSE_CHAT_AUTHKEY=your-key
 ```
 
-也可以使用 `OPENAI_API_KEY`，或把配置写入 `~/.pennyparse/pennyparse.settings.toml`、`./pennyparse.settings.toml`。
+也可以使用 `OPENAI_API_KEY`，或把同样的配置写入 `~/.pennyparse/pennyparse.settings.toml`、`./pennyparse.settings.toml`。
 
 可选文档后端：
 
@@ -40,7 +42,7 @@ python -m pip install "pennyparse[docx]"
 
 ## 准备用户工具
 
-把外部工具写在 `${HOME}/pennyparse.toolbox_user.txt`，也可以用 `--from` 指定其他文件。内容用朴素的技术描述即可：工具名、用途范围、成本、参数、凭据、调用方式和注意事项。
+把外部工具写在 `${HOME}/pennyparse.toolbox_user.txt`，也可以用 `--from` 指定别的文件。内容用平实的技术说明即可：工具名、用途范围、成本、参数、凭据、调用方式和注意事项。
 
 生成工具运行时：
 
@@ -49,7 +51,7 @@ pennyparse init tools
 pennyparse init tools --from ./pennyparse.toolbox_user.txt --force
 ```
 
-生成结果位于 `${HOME}/.pennyparse/user_toolbox.py`。它是可执行 Python 代码，使用真实凭据前应先检查。
+生成结果位于 `${HOME}/.pennyparse/user_toolbox.py`。它是可执行 Python 代码，带真实凭据使用前，须先看一遍。
 
 ## 初始化文档目录
 
@@ -60,7 +62,7 @@ cd /path/to/documents
 pennyparse init docs
 ```
 
-命令会写入 `./.pennyparse_memory.txt`。这个文件是自然语言记忆，用来记录文件分组、解析难度和低成本预览结果。它不是数据库，也不要求手工维护结构。
+命令会写入 `./.pennyparse_memory.txt`。这个文件是一份自然语言记忆，记下文件分组、解析难度和低成本预览结果。它只是给后续解析看的札记，不要求手工维护结构。
 
 完整初始化会同时生成工具和目录记忆：
 
@@ -88,7 +90,7 @@ pennyparse run invoice.pdf scans/ --out-dir pennyparse_results
 docs/report.pdf -> pennyparse_results/docs/report.pdf.txt
 ```
 
-运行过程中，PennyParse 会向 `.pennyparse_memory.txt` 追加批次摘要和最终输出摘要。这些内容帮助后续解析选择工具。
+运行过程中，PennyParse 会向 `.pennyparse_memory.txt` 追加批次摘要和最终输出摘要。以后再跑，它便能少走一点弯路。
 
 ## 查看与运行工具
 
@@ -99,7 +101,7 @@ pennyparse tool pdf2txt --help
 pennyparse tool pdf2txt --path report.pdf
 ```
 
-不可用工具不会出现在普通列表中，原因会写入日志。常见原因是缺少可选依赖，或缺少工具声明的环境变量。
+不可用工具不会出现在普通列表中，原因会写入日志。常见原因是缺少可选依赖，或少了工具声明的环境变量。
 
 ## 配置优先级
 
@@ -130,15 +132,15 @@ max_length = 1000
 
 **每个命令都需要模型吗？**
 
-不需要。工具查看和部分本地解析可以不用模型。`init tools` 和 `init docs` 需要模型，因为它们要让 agent 生成工具代码或理解目录结构。
+不需要。查看工具和不少本地解析路径，都可以不用模型。`init tools` 和 `init docs` 需要模型，因为它们要让 Agent 生成工具代码，或判断目录里那些文件大概该怎样分组。
 
 **为什么 PDF 会被转成逐页图片？**
 
-解析器会先尝试文本层提取。如果评审认为结果不可用，并且 PDF 图片后端可用，系统会把页面渲染成图片，再逐页解析并合并。
+解析器会先试文本层提取。若评审认为结果不可用，而 PDF 图片后端也在，系统会把页面渲染成图片，再逐页解析并合并。
 
 **为什么 `.pennyparse_memory.txt` 不是 JSON？**
 
-它只是给解析器的软提示，不是事实来源。文件发现、工具校验和输出写入仍由确定性代码完成。
+它只是给解析器的软提示。文件发现、工具校验和输出写入，仍由确定性代码完成。
 
 **错误信息在哪里看？**
 

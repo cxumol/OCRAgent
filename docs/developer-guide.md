@@ -1,6 +1,8 @@
 # Developer Guide
 
-PennyParse is a small Python CLI with agent-assisted edges. Development is easiest when you keep the same split as the runtime: deterministic command code owns contracts; agents supply judgments behind those contracts.
+PennyParse is a small Python CLI with agent-assisted edges. Development is easiest when the code keeps the same split as the runtime: deterministic command code owns contracts; agents supply judgment behind those contracts.
+
+The project is about graded parsing. Cheap text extraction, local OCR, remote OCR, VLMs, and multimodal LLMs should not be treated as one interchangeable bucket. Code changes should preserve that routing discipline: inspect cheaply, spend carefully, review before writing.
 
 ## Environment
 
@@ -111,6 +113,8 @@ Keep tool contracts narrow. New tools should enter through specs and handlers, n
 
 Use agents where fixed code would encode brittle judgment: interpreting user toolbox prose, grouping heterogeneous document folders, choosing among uncertain parser results, and reviewing extraction quality. Use deterministic code for paths, config, validation, imports, subprocess boundaries, and output writes.
 
+Protect the review loop. Even a text-only model can reject broken extraction by reading the result for fluency, ordering, repeated noise, and layout drift. Changes that bypass review should be treated as behavior changes, not plumbing.
+
 When a code change affects behavior, update the relevant document under `docs/` in the same change.
 
 ## Debugging
@@ -131,6 +135,6 @@ ${HOME}/.pennyparse/user_toolbox.py
 ./.pennyparse_memory.txt
 ```
 
-For agent issues, lower the problem to the loop contract: what messages entered, what tool call or code block came back, what deterministic validator rejected, and whether the failure was fed back into the next turn.
+For agent issues, reduce the problem to the loop contract: what messages entered, what tool call or code block came back, what deterministic validator rejected, and whether the failure was fed back into the next turn.
 
 When `init tools` cannot reach the chat endpoint, it still writes an importable fallback `user_toolbox.py`. The fallback records inferred tool names as unavailable with the request failure reason. Treat this as a degraded initialization path: builtin local tools can still run, and remote user tools become active only after a successful regeneration.

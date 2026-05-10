@@ -1,6 +1,8 @@
 # User Guide
 
-PennyParse parses a folder of documents into text files. It works best when you initialize the folder once, let it learn cheap hints about the files, then run parsing through a stable tool set.
+PennyParse turns a mixed document folder into UTF-8 text. It works best when you initialize the folder once, let it learn cheap signals about the files, then parse through a stable tool set.
+
+The workflow is graded. Embedded PDF text, clean scans, decorative type, handwriting, formulas, and tables do not deserve the same parser or the same bill. PennyParse starts with the cheapest plausible route, reviews the result, and escalates when the page asks for more.
 
 ## Install And Configure
 
@@ -21,7 +23,7 @@ pennyparse --help
 
 </details>
 
-Configure an OpenAI-compatible chat-completions endpoint when you need LLM-backed initialization:
+Configure an OpenAI-compatible chat-completions endpoint for LLM-backed initialization:
 
 ```shell
 export PENNYPARSE_CHAT_BASE=http://localhost:8080/v1
@@ -40,7 +42,7 @@ python -m pip install "pennyparse[docx]"
 
 ## Prepare User Tools
 
-Create a toolbox description at `${HOME}/pennyparse.toolbox_user.txt`, or pass another file with `--from`. Describe each external parser or API in plain technical prose: name, scope, cost, flags, credentials, and how to call it.
+Create a toolbox description at `${HOME}/pennyparse.toolbox_user.txt`, or pass another file with `--from`. Describe each external parser or API in plain technical prose: name, scope, cost, flags, credentials, strengths, limits, and how to call it.
 
 Generate the runtime:
 
@@ -60,7 +62,7 @@ cd /path/to/documents
 pennyparse init docs
 ```
 
-The command writes `./.pennyparse_memory.txt`. It is prose, not a database. It records file groups, rough parsing difficulty, and cheap preview observations so later runs can start with better tool choices.
+The command writes `./.pennyparse_memory.txt`. It is prose used as guidance. It records file groups, rough parsing difficulty, and cheap preview observations so later runs can start with better tool choices.
 
 The full initialization command runs both steps:
 
@@ -88,7 +90,7 @@ Each successful source writes one UTF-8 text file under the output directory. Th
 docs/report.pdf -> pennyparse_results/docs/report.pdf.txt
 ```
 
-During a run, PennyParse appends short batch notes and a final output summary to `.pennyparse_memory.txt`. The notes help future runs; they are not required to be hand-edited.
+During a run, PennyParse appends short batch notes and a final output summary to `.pennyparse_memory.txt`. The notes help future runs and do not need hand editing.
 
 ## Inspect Tools
 
@@ -130,7 +132,7 @@ max_length = 1000
 
 **Do I need a chat model for every command?**
 
-No. Tool listing and many local parsing paths can run without one. `init tools` and `init docs` need a configured model because they ask an agent to synthesize tools or group a folder.
+No. Tool listing and many local parsing paths can run without one. `init tools` and `init docs` need a configured model because they ask an agent to synthesize tools or read the shape of a folder.
 
 **Why did a PDF become page images?**
 
@@ -138,7 +140,7 @@ The parser tried text extraction first. If review rejected it and the PDF image 
 
 **Why is `.pennyparse_memory.txt` prose?**
 
-Because it is guidance for ranking and summarization, not a source of truth. Filesystem discovery, tool validation, and output writing remain deterministic.
+Because it is guidance for ranking and summarization. Filesystem discovery, tool validation, and output writing remain deterministic.
 
 **Where should errors be read?**
 
