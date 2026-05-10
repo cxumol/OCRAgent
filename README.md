@@ -31,7 +31,7 @@ English | [简体中文](#简体中文)
 
 ![Core value comparison](https://github.com/user-attachments/assets/a4e0b2e2-0b49-4ae8-92e9-ee2f6eb722f5)
 
-Not "yet another doc parser", but AI agent for graded document parsing, for resource allocation with judgment.
+Instead of "yet another doc parser", PennyParse is an Agentic Workflow that orchestrates multiple parsing tools for graded document parsing and judgment-based resource allocation.
 
 A cheap parser gets the first try when the document looks easy. Costlier OCR, VLMs, and cloud APIs enter when the content needs them.
 
@@ -276,7 +276,7 @@ PennyParse is beta. The command shape is usable, and breaking changes are still 
 
 ## 为什么是 PennyParse
 
-PennyParse 并非 "Yet Another 图文识别工具"，而是元工具, 用来统筹调度多种图文识别工具的 Agentic Workflow。 把一窝鸡飞狗跳的文档，慢慢理成干净的纯文本。
+并非 "Yet Another 图文识别工具"，PennyParse 是用来统筹调度多种图文识别工具的 Agentic Workflow。 把一窝鸡飞狗跳的文档，慢慢理成干净的纯文本。
 
 容易的页，先请便宜的工具去读；读不动了，再请更贵的OCR、VLM或云端API。算力如灯油，明处不必添灯，暗处才该多照一照。
 
