@@ -4,7 +4,7 @@ PennyParse is a small Python CLI with agent-assisted edges. Development is easie
 
 The project is about graded parsing. Cheap text extraction, local OCR, remote OCR, VLMs, and multimodal LLMs should not be treated as one interchangeable bucket. Code changes should preserve that routing discipline: inspect cheaply, spend carefully, review before writing.
 
-![PennyParse system architecture](assets/PennyParse-System-Architecture-detailed.jpg)
+![PennyParse system architecture](assets/PennyParse-System-Architecture-detailed-en.jpg)
 
 ## Environment
 
