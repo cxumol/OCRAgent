@@ -139,7 +139,7 @@ AI Agents  （init_tools / parser / reviewer）
 Tool chain  （builtin tools + user_toolbox.py）
 ```
 
-![Detailed architecture diagram](docs/assets/readme-detailed-architecture.png)
+![Architecture diagram](docs/assets/readme-architecture.png)
 
 PennyParse has three working planes:
 
@@ -350,7 +350,7 @@ AI Agents 智能体  （init_tools / parser / reviewer）
 工具链  （builtin tools + user_toolbox.py）
 ```
 
-![详细架构图](docs/assets/readme-detailed-architecture.png)
+![架构图](docs/assets/readme-architecture.png)
 
 | 层次 | 负责 | 例子 |
 | --- | --- | --- |
