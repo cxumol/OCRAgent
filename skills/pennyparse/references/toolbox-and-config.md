@@ -1,5 +1,28 @@
 # Toolbox And Configuration
 
+## Install And Entry Points
+
+Prefer a virtual environment on user machines:
+
+```shell
+python -m venv .venv
+. .venv/bin/activate
+python -m pip install "pennyparse[full]"
+```
+
+If the `pennyparse` console script is not on `PATH`, use the module entry:
+
+```shell
+python -m pennyparse --help
+```
+
+If optional backends fail to install, use the base package and inspect available tools:
+
+```shell
+python -m pip install pennyparse
+pennyparse tool --list
+```
+
 ## Chat Endpoint
 
 LLM-backed commands need an OpenAI-compatible chat-completions endpoint:
