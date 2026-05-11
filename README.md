@@ -277,11 +277,11 @@ PennyParse is beta. The command shape is usable, and breaking changes are still 
 
 ## 为什么是 PennyParse
 
-并非 "Yet Another 图文识别工具"，PennyParse 是用来统筹调度多种图文识别工具的 Agentic Workflow。 把一窝鸡飞狗跳的文档，慢慢理成干净的纯文本。
+并非 "Yet Another 图文识别工具"，PennyParse 是用来统筹调度多种图文识别工具的 Agentic Workflow。 把一窝鸡飞狗跳的文档，整理成干净的纯文本。
 
 容易的页，先请便宜的工具去读；读不动了，再请更贵的OCR、VLM或云端API。算力如灯油，明处不必添灯，暗处才该多照一照。
 
-Agent先品尝解析工具和文档的调性，再分派任务。解析不再是一锤子买卖，而有校对，有打回重做，有请大师傅出山。
+Agent先品尝解析工具和文档的调性，再分派任务。 带上 Agent 的解析不再是一锤子买卖，而是有校对，有打回重做，有请大师傅出山。
 
 ![核心价值对比图](https://github.com/user-attachments/assets/a4e0b2e2-0b49-4ae8-92e9-ee2f6eb722f5)
 
