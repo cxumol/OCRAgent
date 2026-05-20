@@ -1,7 +1,7 @@
 [project]
 name = "ocragent"
-version = "0.1.1"
-description = "Add your description here"
+version = "0.1.2a1"
+description = "Agentic image/PDF/docs digitalization. Router for your own OCRs/VLMs/text-extractors."
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"

@@ -148,7 +148,7 @@ wheels = [
 
 [[package]]
 name = "ocragent"
-version = "0.1.1"
+version = "0.1.2a1"
 source = { editable = "." }
 dependencies = [
     { name = "fastapi" },
