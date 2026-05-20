@@ -267,7 +267,7 @@ for _ in range(int(aigc.agent.max_iter)):
 
 ## README.md
 
-- 国际化/在地化: 单文件双语版本, 英文在上, 简体中文在下, 水平线分割, 总标题下方链接跳转语言版本 (en, zh-hans) 
+- 国际化/在地化: 双语版本, 英文 README.md / 简体中文 README_zh-Hans.md, 总标题下方链接跳转语言版本
 - 遣词造句体现良好语感, 注重亲和力, 吸引力: 
   + Steven Pinker classic style 如事实般呈现观点, 平实素朴
   + 面向大学生知识水平的大众读者, 拉近读者距离, 引起情绪共鸣
