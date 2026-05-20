@@ -1,6 +1,6 @@
 <img alt="OCRAgent logo rmbg640" style="float: right;right: 0px" src="https://github.com/user-attachments/assets/36372b56-d9a7-4a2b-a73d-36f4db5668fb" width="96" div align=right>
 
-# OCRAgent 厘晰
+# OCRAgent
 
 [![Publish to PyPI](https://github.com/cxumol/OCRAgent/actions/workflows/publish-pypi.yml/badge.svg)](https://github.com/cxumol/OCRAgent/actions/workflows/publish-pypi.yml)
 [![PyPI version](https://badge.fury.io/py/ocragent.svg)](https://badge.fury.io/py/ocragent)
