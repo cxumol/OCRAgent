@@ -1,4 +1,4 @@
-<img alt="OCRAgent logo rmbg640" style="float: right;right: 0px" src="https://github.com/user-attachments/assets/36372b56-d9a7-4a2b-a73d-36f4db5668fb" width="96" div align=right>
+<img alt="OCRAgent logo rmbg640" style="float: right;right: 0px" src="docs/assets/readme-logo-rmbg-640.png" width="96" div align=right>
 
 # OCRAgent
 
@@ -8,7 +8,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python Versions](https://img.shields.io/pypi/pyversions/ocragent)](https://pypi.org/project/ocragent/)
 
-![Brand banner](https://github.com/user-attachments/assets/c3247c7f-52db-4a7b-b46f-b543f2d88e5b)
+![Brand banner](docs/assets/readme-brand-banner.jpg)
 
 > 丝帛简牍数码书，千金半厘辨分殊。  
 > 何须一模破万卷，自能调度在慧枢。 
@@ -30,7 +30,7 @@ English | [简体中文](#简体中文)
 
 ## Why OCRAgent
 
-![Core value comparison](https://github.com/user-attachments/assets/a4e0b2e2-0b49-4ae8-92e9-ee2f6eb722f5)
+![Core value comparison](docs/assets/readme-core-value-comparison.jpg)
 
 Instead of "yet another doc parser", OCRAgent is an Agentic Workflow that orchestrates multiple parsing tools for graded document parsing and judgment-based resource allocation.
 
@@ -189,7 +189,7 @@ AI Agents  （init_tools / parser / reviewer）
 Tool chain  （builtin tools + user_toolbox.py）
 ```
 
-![Architecture diagram](https://github.com/user-attachments/assets/e09c8cb7-06ad-4aa2-828f-8dfffa7f1939)
+![Architecture diagram](docs/assets/readme-architecture.jpg)
 
 OCRAgent has three working planes:
 
@@ -283,7 +283,7 @@ OCRAgent is beta. The command shape is usable, and breaking changes are still po
 
 Agent先品尝解析工具和文档的调性，再分派任务。 带上 Agent 的解析不再是一锤子买卖，而是有校对，有打回重做，有请大师傅出山。
 
-![核心价值对比图](https://github.com/user-attachments/assets/a4e0b2e2-0b49-4ae8-92e9-ee2f6eb722f5)
+![核心价值对比图](docs/assets/readme-core-value-comparison.jpg)
 
 ## 快速开始
 
@@ -436,7 +436,7 @@ AI Agents 智能体  （init_tools / parser / reviewer）
 工具链  （builtin tools + user_toolbox.py）
 ```
 
-![架构图](https://github.com/user-attachments/assets/e09c8cb7-06ad-4aa2-828f-8dfffa7f1939)
+![架构图](docs/assets/readme-architecture.jpg)
 
 | 层次 | 负责 | 例子 |
 | --- | --- | --- |

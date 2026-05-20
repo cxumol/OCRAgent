@@ -4,7 +4,7 @@ OCRAgent is a small Python CLI with agent-assisted edges. Development is easiest
 
 The project is about graded parsing. Cheap text extraction, local OCR, remote OCR, VLMs, and multimodal LLMs should not be treated as one interchangeable bucket. Code changes should preserve that routing discipline: inspect cheaply, spend carefully, review before writing.
 
-![OCRAgent system architecture](assets/OCRAgent-System-Architecture-detailed-en.jpg)
+![OCRAgent system architecture](assets/OCRAgent-System-Architecture-detailed.jpg)
 
 ## Environment
 
