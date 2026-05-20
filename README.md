@@ -1,26 +1,26 @@
-<img alt="PennyParse logo rmbg640" style="float: right;right: 0px" src="https://github.com/user-attachments/assets/36372b56-d9a7-4a2b-a73d-36f4db5668fb" width="96" div align=right>
+<img alt="OCRAgent logo rmbg640" style="float: right;right: 0px" src="https://github.com/user-attachments/assets/36372b56-d9a7-4a2b-a73d-36f4db5668fb" width="96" div align=right>
 
-# PennyParse 厘晰
+# OCRAgent 厘晰
 
-[![Publish to PyPI](https://github.com/cxumol/PennyParse/actions/workflows/publish-pypi.yml/badge.svg)](https://github.com/cxumol/PennyParse/actions/workflows/publish-pypi.yml)
-[![PyPI version](https://badge.fury.io/py/pennyparse.svg)](https://badge.fury.io/py/pennyparse)
-<!-- [![PyPI Downloads](https://img.shields.io/pepy/dt/pennyparse)](https://pepy.tech/projects/pennyparse) -->
+[![Publish to PyPI](https://github.com/cxumol/OCRAgent/actions/workflows/publish-pypi.yml/badge.svg)](https://github.com/cxumol/OCRAgent/actions/workflows/publish-pypi.yml)
+[![PyPI version](https://badge.fury.io/py/ocragent.svg)](https://badge.fury.io/py/ocragent)
+<!-- [![PyPI Downloads](https://img.shields.io/pepy/dt/ocragent)](https://pepy.tech/projects/ocragent) -->
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Python Versions](https://img.shields.io/pypi/pyversions/pennyparse)](https://pypi.org/project/pennyparse/)
+[![Python Versions](https://img.shields.io/pypi/pyversions/ocragent)](https://pypi.org/project/ocragent/)
 
 ![Brand banner](https://github.com/user-attachments/assets/c3247c7f-52db-4a7b-b46f-b543f2d88e5b)
 
 > 丝帛简牍数码书，千金半厘辨分殊。  
 > 何须一模破万卷，自能调度在慧枢。 
 
-> Penny parse, penny wise.
+> OCR-first, agent-guided.
 
 Document parsing should be tiered, routed, and reviewed. Use cheap local extraction when it is enough. Escalate only when the AI agent finds the page needs it.
 
 - Tesseract OCR 搞不定艺术字形和生僻字符; 顶级多模态 LLM 解析出版小说轻轻松松却浪费算力时间, 所以, 你需要分级。 Tesseract OCR can't handle artistic fonts and rare characters; top-tier multimodal LLMs can easily parse published novels but waste computing power and time, so you need a tiered approach. 
 - 同样是多模态大模型, 模型甲更擅长手写识别, 模型乙更胜任公式识别, 所以, 你需要 Agent 帮你分配调度。 Even among multimodal large models, Model A is better at handwriting recognition, while Model B excels at formula recognition, so you need an Agent to handle allocation and scheduling.
 - Agentic Loop 用于文档识别, 好处在于有校对, 即使校对选用了不带视觉功能的 LLM, 也可以从 读着是否通顺､ 排版是否错位､ 表格是否漂移 等方面校对。 The benefit of an Agentic Loop for document recognition is proofreading; even if the proofreading uses an LLM without vision capabilities, it can still check from angles like whether the text reads smoothly or whether the layout is misaligned.
-- 你搭了 12 种 OCR 模型, 要录入 34 份不同品种的档案? 交给 Agent 吧, PennyParse 帮你搞定｡ You've collected 12 OCR APIs and want to digitize 34 different varieties of documents? Leave it to the AI Agent, PennyParse will handle it for you.
+- 你搭了 12 种 OCR 模型, 要录入 34 份不同品种的档案? 交给 Agent 吧, OCRAgent 帮你搞定｡ You've collected 12 OCR APIs and want to digitize 34 different varieties of documents? Leave it to the AI Agent, OCRAgent will handle it for you.
 
 ---
 
@@ -28,31 +28,31 @@ Document parsing should be tiered, routed, and reviewed. Use cheap local extract
 
 English | [简体中文](#简体中文)
 
-## Why PennyParse
+## Why OCRAgent
 
 ![Core value comparison](https://github.com/user-attachments/assets/a4e0b2e2-0b49-4ae8-92e9-ee2f6eb722f5)
 
-Instead of "yet another doc parser", PennyParse is an Agentic Workflow that orchestrates multiple parsing tools for graded document parsing and judgment-based resource allocation.
+Instead of "yet another doc parser", OCRAgent is an Agentic Workflow that orchestrates multiple parsing tools for graded document parsing and judgment-based resource allocation.
 
 A cheap parser gets the first try when the document looks easy. Costlier OCR, VLMs, and cloud APIs enter when the content needs them.
 
-PennyParse gives its agent enough context to assign work by page character instead of treating every model as interchangeable.
+OCRAgent gives its agent enough context to assign work by page character instead of treating every model as interchangeable.
 
 ## First Run
 
-Install PennyParse from PyPI with the common document backends:
+Install OCRAgent from PyPI with the common document backends:
 
 ```shell
-python -m pip install "pennyparse[full]"
-pennyparse --help
+python -m pip install "ocragent[full]"
+ocragent --help
 ```
 
 <details>
 <summary>Prefer uv?</summary>
 
 ```shell
-uv tool install "pennyparse[full]"
-pennyparse --help
+uv tool install "ocragent[full]"
+ocragent --help
 ```
 
 </details>
@@ -60,47 +60,47 @@ pennyparse --help
 For LLM-backed commands, configure an OpenAI-compatible chat-completions endpoint:
 
 ```shell
-export PENNYPARSE_CHAT_BASE=http://localhost:8080/v1
-export PENNYPARSE_CHAT_MODEL=your-model
-export PENNYPARSE_CHAT_AUTHKEY=your-key
+export OCRAGENT_CHAT_BASE=http://localhost:8080/v1
+export OCRAGENT_CHAT_MODEL=your-model
+export OCRAGENT_CHAT_AUTHKEY=your-key
 ```
 
-`OPENAI_API_KEY` is also accepted as the auth key. The same values can live in `~/.pennyparse/pennyparse.settings.toml`, `./pennyparse.settings.toml`, or `.env`. Use [src/pennyparse/pennyparse.settings.default.toml](src/pennyparse/pennyparse.settings.default.toml) as the configuration reference.
+`OPENAI_API_KEY` is also accepted as the auth key. The same values can live in `~/.ocragent/ocragent.settings.toml`, `./ocragent.settings.toml`, or `.env`. Use [src/ocragent/ocragent.settings.default.toml](src/ocragent/ocragent.settings.default.toml) as the configuration reference.
 
 List builtin tools:
 
 ```shell
-pennyparse tool --list
+ocragent tool --list
 ```
 
-If you want PennyParse to call your own OCR, VLM, shell command, or API, describe it in plain text first:
+If you want OCRAgent to call your own OCR, VLM, shell command, or API, describe it in plain text first:
 
 ```text
-$HOME/pennyparse.toolbox_user.txt
+$HOME/ocragent.toolbox_user.txt
 ```
 
-The toolbox description format can follow [src/pennyparse/pennyparse.toolbox_user.example.txt](src/pennyparse/pennyparse.toolbox_user.example.txt). Tool descriptions can be copied from the vendor's official docs, trimmed to name, scope, cost, flags, limits, and call shape. Put secrets such as API keys in environment variables, then name those variables in the toolbox prose.
+The toolbox description format can follow [src/ocragent/ocragent.toolbox_user.example.txt](src/ocragent/ocragent.toolbox_user.example.txt). Tool descriptions can be copied from the vendor's official docs, trimmed to name, scope, cost, flags, limits, and call shape. Put secrets such as API keys in environment variables, then name those variables in the toolbox prose.
 
 Then generate the tool runtime:
 
 ```shell
-pennyparse init tools
+ocragent init tools
 ```
 
-PennyParse writes executable Python to `$HOME/.pennyparse/user_toolbox.py`. Review that file before using it with real credentials.
+OCRAgent writes executable Python to `$HOME/.ocragent/user_toolbox.py`. Review that file before using it with real credentials.
 
 Then parse a folder:
 
 ```shell
 cd /path/to/documents
-pennyparse init docs
-pennyparse run --out-dir pennyparse_results
+ocragent init docs
+ocragent run --out-dir ocragent_results
 ```
 
 ## CLI Example
 
 ```text
-$ pennyparse tool --list --scope=parser
+$ ocragent tool --list --scope=parser
 pdf2txt	scope: parser cost: low	Extract PDF text with PyMuPDF.
 	--path /path/to/file.pdf
 
@@ -112,7 +112,7 @@ pandoc2txt	scope: parser cost: low	Convert office documents to plain text with P
 	--path /path/to/file
 
 $ cd ~/cases/mixed_docs
-$ pennyparse init tools --from ./pennyparse.toolbox_user.txt
+$ ocragent init tools --from ./ocragent.toolbox_user.txt
 {
   "ok": true,
   "usertools_valid": [
@@ -120,13 +120,13 @@ $ pennyparse init tools --from ./pennyparse.toolbox_user.txt
   ],
   "usertools_failed": [],
   "agent_turns": 1,
-  "result_file": "/home/me/.pennyparse/user_toolbox.py"
+  "result_file": "/home/me/.ocragent/user_toolbox.py"
 }
 
-$ pennyparse init docs
+$ ocragent init docs
 {
   "ok": true,
-  "result_file": "/home/me/cases/mixed_docs/.pennyparse_memory.txt",
+  "result_file": "/home/me/cases/mixed_docs/.ocragent_memory.txt",
   "groups": [
     {
       "name": "pdf_text",
@@ -137,17 +137,17 @@ $ pennyparse init docs
   "unmatched_count": 0
 }
 
-$ pennyparse run invoice.pdf scans/ --out-dir pennyparse_results
+$ ocragent run invoice.pdf scans/ --out-dir ocragent_results
 {
   "ok": true,
-  "out_dir": "/home/me/cases/mixed_docs/pennyparse_results",
+  "out_dir": "/home/me/cases/mixed_docs/ocragent_results",
   "parsed_count": 18,
   "failed_count": 0,
   "skipped_count": 0,
   "results": [
     {
       "source": "invoice.pdf",
-      "output_file": "/home/me/cases/mixed_docs/pennyparse_results/invoice.pdf.txt",
+      "output_file": "/home/me/cases/mixed_docs/ocragent_results/invoice.pdf.txt",
       "...": "..."
     }
   ],
@@ -164,17 +164,17 @@ The JSON examples above keep the real field names and shorten long arrays with `
 
 ## What You Get
 
-PennyParse preserves relative paths in the output directory:
+OCRAgent preserves relative paths in the output directory:
 
 ```text
-docs/report.pdf -> pennyparse_results/docs/report.pdf.txt
-scans/page-01.jpg -> pennyparse_results/scans/page-01.jpg.md
+docs/report.pdf -> ocragent_results/docs/report.pdf.txt
+scans/page-01.jpg -> ocragent_results/scans/page-01.jpg.md
 ```
 
 It also maintains a folder memory file:
 
 ```text
-.pennyparse_memory.txt
+.ocragent_memory.txt
 ```
 
 That memory is plain prose. It helps later parser runs choose a sensible starting cost without forcing the project into a rigid database schema.
@@ -182,7 +182,7 @@ That memory is plain prose. It helps later parser runs choose a sensible startin
 ## Architecture
 
 ```text
-CLI  （pennyparse init / run / tool）
+CLI  （ocragent init / run / tool）
  │
 AI Agents  （init_tools / parser / reviewer）
  │
@@ -191,7 +191,7 @@ Tool chain  （builtin tools + user_toolbox.py）
 
 ![Architecture diagram](https://github.com/user-attachments/assets/e09c8cb7-06ad-4aa2-828f-8dfffa7f1939)
 
-PennyParse has three working planes:
+OCRAgent has three working planes:
 
 | Plane | Owns | Examples |
 | --- | --- | --- |
@@ -206,8 +206,8 @@ The parser never calls vendors directly. It asks the tool registry what is avail
 Configuration priority:
 
 1. Environment variables.
-2. `./pennyparse.settings.toml`.
-3. `~/.pennyparse/pennyparse.settings.toml`.
+2. `./ocragent.settings.toml`.
+3. `~/.ocragent/ocragent.settings.toml`.
 4. Package defaults.
 
 Common settings:
@@ -220,7 +220,7 @@ model = ""
 model_hasVision = true
 
 [output]
-dir = "pennyparse_results"
+dir = "ocragent_results"
 ext = "auto"
 parser_summary_batch = 5
 
@@ -228,11 +228,11 @@ parser_summary_batch = 5
 max_length = 1000
 ```
 
-The complete default shape is in [src/pennyparse/pennyparse.settings.default.toml](src/pennyparse/pennyparse.settings.default.toml).
+The complete default shape is in [src/ocragent/ocragent.settings.default.toml](src/ocragent/ocragent.settings.default.toml).
 
 ## Contributing
 
-PennyParse is beta, which makes it a good time to shape the core. Useful contributions are small and concrete:
+OCRAgent is beta, which makes it a good time to shape the core. Useful contributions are small and concrete:
 
 - Add or improve builtin parser tools.
 - Add demo assets that represent real document pain.
@@ -250,11 +250,11 @@ uv run --extra pdf python -m unittest discover -s tests
 
 Useful code paths:
 
-- `src/pennyparse/cli.py`: command boundary.
-- `src/pennyparse/cmd/`: command implementations.
-- `src/pennyparse/cmd/tool.py`: builtin and user tool contract.
-- `src/pennyparse/agent/`: model-facing loops.
-- `src/pennyparse/config.py`: layered settings.
+- `src/ocragent/cli.py`: command boundary.
+- `src/ocragent/cmd/`: command implementations.
+- `src/ocragent/cmd/tool.py`: builtin and user tool contract.
+- `src/ocragent/agent/`: model-facing loops.
+- `src/ocragent/config.py`: layered settings.
 - `tests/`: current test suite and CLI flow checks.
 
 ## Documentation
@@ -267,7 +267,7 @@ Useful code paths:
 
 ## Status
 
-PennyParse is beta. The command shape is usable, and breaking changes are still possible. The project is looking for contributors who care about document extraction, local-first tooling, and agent workflows with clear boundaries.
+OCRAgent is beta. The command shape is usable, and breaking changes are still possible. The project is looking for contributors who care about document extraction, local-first tooling, and agent workflows with clear boundaries.
 
 ---
 
@@ -275,9 +275,9 @@ PennyParse is beta. The command shape is usable, and breaking changes are still 
 
 [English](#english) | 简体中文
 
-## 为什么是 PennyParse
+## 为什么是 OCRAgent
 
-并非 "Yet Another 图文识别工具"，PennyParse 是用来统筹调度多种图文识别工具的 Agentic Workflow。 把一窝鸡飞狗跳的文档，整理成干净的纯文本。
+并非 "Yet Another 图文识别工具"，OCRAgent 是用来统筹调度多种图文识别工具的 Agentic Workflow。 把一窝鸡飞狗跳的文档，整理成干净的纯文本。
 
 容易的页，先请便宜的工具去读；读不动了，再请更贵的OCR、VLM或云端API。算力如灯油，明处不必添灯，暗处才该多照一照。
 
@@ -287,19 +287,19 @@ Agent先品尝解析工具和文档的调性，再分派任务。 带上 Agent �
 
 ## 快速开始
 
-从 PyPI 安装 PennyParse，并带上常用文档后端：
+从 PyPI 安装 OCRAgent，并带上常用文档后端：
 
 ```shell
-python -m pip install "pennyparse[full]"
-pennyparse --help
+python -m pip install "ocragent[full]"
+ocragent --help
 ```
 
 <details>
 <summary>偏好 uv？</summary>
 
 ```shell
-uv tool install "pennyparse[full]"
-pennyparse --help
+uv tool install "ocragent[full]"
+ocragent --help
 ```
 
 </details>
@@ -307,47 +307,47 @@ pennyparse --help
 需要 LLM 支持的命令时，配置兼容 OpenAI chat-completions 的端点：
 
 ```shell
-export PENNYPARSE_CHAT_BASE=http://localhost:8080/v1
-export PENNYPARSE_CHAT_MODEL=your-model
-export PENNYPARSE_CHAT_AUTHKEY=your-key
+export OCRAGENT_CHAT_BASE=http://localhost:8080/v1
+export OCRAGENT_CHAT_MODEL=your-model
+export OCRAGENT_CHAT_AUTHKEY=your-key
 ```
 
-也可以使用 `OPENAI_API_KEY`。同样的配置可以写入 `~/.pennyparse/pennyparse.settings.toml`、`./pennyparse.settings.toml` 或 `.env`。配置格式可参考 [src/pennyparse/pennyparse.settings.default.toml](src/pennyparse/pennyparse.settings.default.toml)。
+也可以使用 `OPENAI_API_KEY`。同样的配置可以写入 `~/.ocragent/ocragent.settings.toml`、`./ocragent.settings.toml` 或 `.env`。配置格式可参考 [src/ocragent/ocragent.settings.default.toml](src/ocragent/ocragent.settings.default.toml)。
 
 查看内建工具：
 
 ```shell
-pennyparse tool --list
+ocragent tool --list
 ```
 
-如果要让 PennyParse 调用你自己的 OCR、VLM、命令行工具或 API，先用普通文本描述它：
+如果要让 OCRAgent 调用你自己的 OCR、VLM、命令行工具或 API，先用普通文本描述它：
 
 ```text
-$HOME/pennyparse.toolbox_user.txt
+$HOME/ocragent.toolbox_user.txt
 ```
 
-用户工具箱的写法可参考 [src/pennyparse/pennyparse.toolbox_user.example.txt](src/pennyparse/pennyparse.toolbox_user.example.txt)。各工具说明可以从对应官方文档摘取，再保留工具名、用途范围、成本、参数、限制和调用方式。API key 等机要内容放进环境变量，在工具箱说明中写环境变量名即可。
+用户工具箱的写法可参考 [src/ocragent/ocragent.toolbox_user.example.txt](src/ocragent/ocragent.toolbox_user.example.txt)。各工具说明可以从对应官方文档摘取，再保留工具名、用途范围、成本、参数、限制和调用方式。API key 等机要内容放进环境变量，在工具箱说明中写环境变量名即可。
 
 然后生成工具运行时：
 
 ```shell
-pennyparse init tools
+ocragent init tools
 ```
 
-PennyParse 会启用 AI Agent 把 pennyparse.toolbox_user.txt 转换成的可执行脚本写入 `$HOME/.pennyparse/user_toolbox.py`。真实使用前，请先审阅这份文件。
+OCRAgent 会启用 AI Agent 把 ocragent.toolbox_user.txt 转换成的可执行脚本写入 `$HOME/.ocragent/user_toolbox.py`。真实使用前，请先审阅这份文件。
 
 然后解析一个目录：
 
 ```shell
 cd /path/to/documents
-pennyparse init docs
-pennyparse run --out-dir pennyparse_results
+ocragent init docs
+ocragent run --out-dir ocragent_results
 ```
 
 ## CLI 运行示例
 
 ```text
-$ pennyparse tool --list --scope=parser
+$ ocragent tool --list --scope=parser
 pdf2txt	scope: parser cost: low	Extract PDF text with PyMuPDF.
 	--path /path/to/file.pdf
 
@@ -359,7 +359,7 @@ pandoc2txt	scope: parser cost: low	Convert office documents to plain text with P
 	--path /path/to/file
 
 $ cd ~/cases/mixed_docs
-$ pennyparse init tools --from ./pennyparse.toolbox_user.txt
+$ ocragent init tools --from ./ocragent.toolbox_user.txt
 {
   "ok": true,
   "usertools_valid": [
@@ -367,13 +367,13 @@ $ pennyparse init tools --from ./pennyparse.toolbox_user.txt
   ],
   "usertools_failed": [],
   "agent_turns": 1,
-  "result_file": "/home/me/.pennyparse/user_toolbox.py"
+  "result_file": "/home/me/.ocragent/user_toolbox.py"
 }
 
-$ pennyparse init docs
+$ ocragent init docs
 {
   "ok": true,
-  "result_file": "/home/me/cases/mixed_docs/.pennyparse_memory.txt",
+  "result_file": "/home/me/cases/mixed_docs/.ocragent_memory.txt",
   "groups": [
     {
       "name": "pdf_text",
@@ -384,17 +384,17 @@ $ pennyparse init docs
   "unmatched_count": 0
 }
 
-$ pennyparse run invoice.pdf scans/ --out-dir pennyparse_results
+$ ocragent run invoice.pdf scans/ --out-dir ocragent_results
 {
   "ok": true,
-  "out_dir": "/home/me/cases/mixed_docs/pennyparse_results",
+  "out_dir": "/home/me/cases/mixed_docs/ocragent_results",
   "parsed_count": 18,
   "failed_count": 0,
   "skipped_count": 0,
   "results": [
     {
       "source": "invoice.pdf",
-      "output_file": "/home/me/cases/mixed_docs/pennyparse_results/invoice.pdf.txt",
+      "output_file": "/home/me/cases/mixed_docs/ocragent_results/invoice.pdf.txt",
       "...": "..."
     }
   ],
@@ -411,17 +411,17 @@ $ pennyparse run invoice.pdf scans/ --out-dir pennyparse_results
 
 ## 产出结果
 
-PennyParse 会在输出目录中保留相对路径：
+OCRAgent 会在输出目录中保留相对路径：
 
 ```text
-docs/report.pdf -> pennyparse_results/docs/report.pdf.txt
-scans/page-01.jpg -> pennyparse_results/scans/page-01.jpg.md
+docs/report.pdf -> ocragent_results/docs/report.pdf.txt
+scans/page-01.jpg -> ocragent_results/scans/page-01.jpg.md
 ```
 
 它还会维护一份目录记忆：
 
 ```text
-.pennyparse_memory.txt
+.ocragent_memory.txt
 ```
 
 这份记忆是普通自然语言文本。后续解析会参考它选择合适的起始成本，但项目不会因此被锁进僵硬的数据表结构。
@@ -429,7 +429,7 @@ scans/page-01.jpg -> pennyparse_results/scans/page-01.jpg.md
 ## 三层架构概览
 
 ```text
-命令行  （pennyparse init / run / tool）
+命令行  （ocragent init / run / tool）
  │
 AI Agents 智能体  （init_tools / parser / reviewer）
  │
@@ -451,8 +451,8 @@ AI Agents 智能体  （init_tools / parser / reviewer）
 配置优先级从高到低：
 
 1. 环境变量。
-2. `./pennyparse.settings.toml`。
-3. `~/.pennyparse/pennyparse.settings.toml`。
+2. `./ocragent.settings.toml`。
+3. `~/.ocragent/ocragent.settings.toml`。
 4. 包内默认配置。
 
 常用配置：
@@ -465,7 +465,7 @@ model = ""
 model_hasVision = true
 
 [output]
-dir = "pennyparse_results"
+dir = "ocragent_results"
 ext = "auto"
 parser_summary_batch = 5
 
@@ -473,11 +473,11 @@ parser_summary_batch = 5
 max_length = 1000
 ```
 
-完整默认配置见 [src/pennyparse/pennyparse.settings.default.toml](src/pennyparse/pennyparse.settings.default.toml)。
+完整默认配置见 [src/ocragent/ocragent.settings.default.toml](src/ocragent/ocragent.settings.default.toml)。
 
 ## 参与贡献
 
-PennyParse 处于 beta 阶段，现在很适合参与塑造。适合下手的贡献包括：
+OCRAgent 处于 beta 阶段，现在很适合参与塑造。适合下手的贡献包括：
 
 - 增加或改进内建解析工具。
 - 增加能代表真实文档难题的 demo assets。
@@ -495,11 +495,11 @@ uv run --extra pdf python -m unittest discover -s tests
 
 常用代码入口：
 
-- `src/pennyparse/cli.py`：命令行入口。
-- `src/pennyparse/cmd/`：命令实现。
-- `src/pennyparse/cmd/tool.py`：内建和用户工具接口约定。
-- `src/pennyparse/agent/`：面向模型的循环。
-- `src/pennyparse/config.py`：分层配置。
+- `src/ocragent/cli.py`：命令行入口。
+- `src/ocragent/cmd/`：命令实现。
+- `src/ocragent/cmd/tool.py`：内建和用户工具接口约定。
+- `src/ocragent/agent/`：面向模型的循环。
+- `src/ocragent/config.py`：分层配置。
 - `tests/`：当前测试套件和 CLI 流程检查。
 
 ## 文档
@@ -512,4 +512,4 @@ uv run --extra pdf python -m unittest discover -s tests
 
 ## 项目状态
 
-PennyParse 处于 beta 阶段。命令形态已经可用，后续仍可能有破坏性变更。若你也关心文档解析、本地优先工具、边界清楚的 Agentic 工作流，此时加入，正好赶上。
+OCRAgent 处于 beta 阶段。命令形态已经可用，后续仍可能有破坏性变更。若你也关心文档解析、本地优先工具、边界清楚的 Agentic 工作流，此时加入，正好赶上。

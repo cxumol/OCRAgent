@@ -21,7 +21,7 @@ def run_init_tools(
     logger = logger or get_logger("cmd.init_tools")
     ensure_user_state_dir(home=home)
 
-    resolved_source = source_path or (home / "pennyparse.toolbox_user.txt")
+    resolved_source = source_path or (home / "ocragent.toolbox_user.txt")
     if not resolved_source.exists():
         raise FileNotFoundError(f"{resolved_source} not found")
 

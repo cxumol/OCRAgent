@@ -7,7 +7,7 @@ from typing import Any, Mapping
 from .._client import ChatClient, ChatSession
 from ..agent.parser import run_parser
 from ..agent import parser as parser_agent
-from ..config import get_user_toolbox_path, load_pp_config
+from ..config import get_user_toolbox_path, load_ocra_config
 from ..logger import get_logger
 from ..utils_aigc import complete_with_retry
 
@@ -23,20 +23,20 @@ def run(
     cwd = cwd or Path.cwd()
     home = home or Path.home()
     logger = logger or get_logger("cmd.run")
-    pp_cfg = load_pp_config(cwd=cwd, home=home)
-    memory_path = cwd / ".pennyparse_memory.txt"
+    ocra_cfg = load_ocra_config(cwd=cwd, home=home)
+    memory_path = cwd / ".ocragent_memory.txt"
     _require_initialized(cwd=cwd, home=home, memory_path=memory_path)
 
-    output_dir = parser_agent._resolve_output_dir(out_dir=out_dir, cwd=cwd, pp_cfg=pp_cfg)
+    output_dir = parser_agent._resolve_output_dir(out_dir=out_dir, cwd=cwd, ocra_cfg=ocra_cfg)
     memory = _read_memory(memory_path)
     targets = parser_agent._resolve_targets(
         paths=paths,
         cwd=cwd,
         memory=memory,
         output_dir=output_dir,
-        pp_cfg=pp_cfg,
+        ocra_cfg=ocra_cfg,
     )
-    batch_size = _parser_summary_batch(pp_cfg)
+    batch_size = _parser_summary_batch(ocra_cfg)
 
     results: list[dict[str, Any]] = []
     failures: list[dict[str, str]] = []
@@ -55,7 +55,7 @@ def run(
         results.extend(batch_results)
         failures.extend(batch_failures)
         skipped.extend(batch_skipped)
-        _append_memory(memory_path, _summarize_batch(batch_results, batch_failures, batch_skipped, pp_cfg=pp_cfg))
+        _append_memory(memory_path, _summarize_batch(batch_results, batch_failures, batch_skipped, ocra_cfg=ocra_cfg))
 
     output_stats = _output_stats(output_dir)
     final_line = _final_summary(
@@ -82,9 +82,9 @@ def run(
 def _require_initialized(*, cwd: Path, home: Path, memory_path: Path) -> None:
     toolbox_path = get_user_toolbox_path(home=home)
     if not toolbox_path.is_file():
-        raise RuntimeError(f"{toolbox_path} not found; run `pennyparse init tools` first")
+        raise RuntimeError(f"{toolbox_path} not found; run `ocragent init tools` first")
     if not memory_path.is_file():
-        raise RuntimeError(f"{memory_path} not found; run `pennyparse init docs` first")
+        raise RuntimeError(f"{memory_path} not found; run `ocragent init docs` first")
     with memory_path.open("r", encoding="utf-8"):
         pass
 
@@ -104,9 +104,9 @@ def _append_memory(memory_path: Path, line: str) -> None:
         handle.write("\n")
 
 
-def _parser_summary_batch(pp_cfg: Mapping[str, Any]) -> int:
-    value = pp_cfg.get("parser_summary_batch")
-    output = pp_cfg.get("output")
+def _parser_summary_batch(ocra_cfg: Mapping[str, Any]) -> int:
+    value = ocra_cfg.get("parser_summary_batch")
+    output = ocra_cfg.get("output")
     if value is None and isinstance(output, Mapping):
         value = output.get("parser_summary_batch")
     return max(1, int(value or 5))
@@ -121,10 +121,10 @@ def _summarize_batch(
     failures: list[dict[str, str]],
     skipped: list[dict[str, str]],
     *,
-    pp_cfg: Mapping[str, Any],
+    ocra_cfg: Mapping[str, Any],
 ) -> str:
     fallback = _fallback_batch_summary(results, failures, skipped)
-    settings = _chat_settings(pp_cfg)
+    settings = _chat_settings(ocra_cfg)
     if not settings.get("model"):
         return fallback
 
@@ -151,7 +151,7 @@ def _summarize_batch(
             message = complete_with_retry(
                 client,
                 session,
-                max_retry=_max_retry(pp_cfg),
+                max_retry=_max_retry(ocra_cfg),
                 temperature=0,
             )
         text = str(message.get("content") or "").strip()
@@ -193,7 +193,7 @@ def _output_stats(output_dir: Path) -> dict[str, Any]:
         files = sorted(
             path
             for path in output_dir.rglob("*")
-            if path.is_file() and ".pennyparse_pages" not in path.relative_to(output_dir).parts
+            if path.is_file() and ".ocragent_pages" not in path.relative_to(output_dir).parts
         )
     by_ext: dict[str, int] = {}
     byte_count = 0
@@ -228,8 +228,8 @@ def _final_summary(
     )
 
 
-def _chat_settings(pp_cfg: Mapping[str, Any]) -> dict[str, Any]:
-    aigc = pp_cfg.get("aigc")
+def _chat_settings(ocra_cfg: Mapping[str, Any]) -> dict[str, Any]:
+    aigc = ocra_cfg.get("aigc")
     api = aigc.get("api") if isinstance(aigc, Mapping) else {}
     chat = api.get("chatcomp") if isinstance(api, Mapping) else {}
     chat = chat if isinstance(chat, Mapping) else {}
@@ -240,8 +240,8 @@ def _chat_settings(pp_cfg: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
-def _max_retry(pp_cfg: Mapping[str, Any]) -> int:
-    aigc = pp_cfg.get("aigc")
+def _max_retry(ocra_cfg: Mapping[str, Any]) -> int:
+    aigc = ocra_cfg.get("aigc")
     agent = aigc.get("agent") if isinstance(aigc, Mapping) else {}
     if isinstance(agent, Mapping):
         return max(1, int(agent.get("max_retry") or 3))

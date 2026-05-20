@@ -19,23 +19,23 @@ SRC_ROOT = REPO_ROOT / "src"
 DEMO_ASSETS = REPO_ROOT / "demo_assets"
 IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tif", ".tiff"}
 CHAT_ENV_KEYS = (
-    "PENNYPARSE_CHAT_BASE",
-    "PENNYPARSE_CHAT_AUTHKEY",
-    "PENNYPARSE_CHAT_MODEL",
+    "OCRAGENT_CHAT_BASE",
+    "OCRAGENT_CHAT_AUTHKEY",
+    "OCRAGENT_CHAT_MODEL",
     "OPENAI_API_KEY",
 )
 
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
-from pennyparse.cmd import init_docs, tool as tool_cmd  # noqa: E402
-from pennyparse.cmd import run as run_cmd  # noqa: E402
-from pennyparse import cli as cli_module  # noqa: E402
-from pennyparse.agent import init_tools as init_tools_agent  # noqa: E402
-from pennyparse.agent import parser as parser_agent  # noqa: E402
-from pennyparse.agent import reviewer as reviewer_agent  # noqa: E402
-from pennyparse._client import ChatSession  # noqa: E402
-from pennyparse import utils, utils_aigc  # noqa: E402
+from ocragent.cmd import init_docs, tool as tool_cmd  # noqa: E402
+from ocragent.cmd import run as run_cmd  # noqa: E402
+from ocragent import cli as cli_module  # noqa: E402
+from ocragent.agent import init_tools as init_tools_agent  # noqa: E402
+from ocragent.agent import parser as parser_agent  # noqa: E402
+from ocragent.agent import reviewer as reviewer_agent  # noqa: E402
+from ocragent._client import ChatSession  # noqa: E402
+from ocragent import utils, utils_aigc  # noqa: E402
 
 
 def _discover_demo_asset(suffixes: set[str]) -> Path:
@@ -47,7 +47,7 @@ def _discover_demo_asset(suffixes: set[str]) -> Path:
 
 
 def _write_fake_user_toolbox(home: Path) -> None:
-    toolbox = home / ".pennyparse" / "user_toolbox.py"
+    toolbox = home / ".ocragent" / "user_toolbox.py"
     toolbox.parent.mkdir(parents=True, exist_ok=True)
     toolbox.write_text(
         "\n".join(
@@ -77,7 +77,7 @@ def _write_fake_user_toolbox(home: Path) -> None:
 
 
 def _write_fake_image_user_toolbox(home: Path) -> None:
-    toolbox = home / ".pennyparse" / "user_toolbox.py"
+    toolbox = home / ".ocragent" / "user_toolbox.py"
     toolbox.parent.mkdir(parents=True, exist_ok=True)
     toolbox.write_text(
         "\n".join(
@@ -110,7 +110,7 @@ def _write_fake_image_user_toolbox(home: Path) -> None:
 
 
 def _write_fake_settings(home: Path) -> None:
-    settings = home / ".pennyparse" / "pennyparse.settings.toml"
+    settings = home / ".ocragent" / "ocragent.settings.toml"
     settings.parent.mkdir(parents=True, exist_ok=True)
     settings.write_text(
         "\n".join(
@@ -129,7 +129,7 @@ def _write_fake_settings(home: Path) -> None:
 
 
 def _write_init_sampling_settings(cwd: Path) -> None:
-    (cwd / "pennyparse.settings.toml").write_text(
+    (cwd / "ocragent.settings.toml").write_text(
         "\n".join(
             [
                 "[aigc.api.chatcomp]",
@@ -148,7 +148,7 @@ def _write_init_sampling_settings(cwd: Path) -> None:
 
 
 def _write_parser_batch_settings(cwd: Path, batch_size: int) -> None:
-    (cwd / "pennyparse.settings.toml").write_text(
+    (cwd / "ocragent.settings.toml").write_text(
         "\n".join(
             [
                 "[output]",
@@ -161,7 +161,7 @@ def _write_parser_batch_settings(cwd: Path, batch_size: int) -> None:
 
 
 def _write_ignore_txt_settings(cwd: Path) -> None:
-    (cwd / "pennyparse.settings.toml").write_text(
+    (cwd / "ocragent.settings.toml").write_text(
         "\n".join(
             [
                 "[init.ignore]",
@@ -209,12 +209,12 @@ class InitDocsTests(unittest.TestCase):
             fixtures.mkdir()
             copied_pdf = Path(shutil.copy2(pdf_asset, fixtures / pdf_asset.name))
             copied_image = Path(shutil.copy2(image_asset, fixtures / image_asset.name))
-            (cwd / "pennyparse.log").write_text("runtime log\n", encoding="utf-8")
+            (cwd / "ocragent.log").write_text("runtime log\n", encoding="utf-8")
 
             _write_fake_user_toolbox(home)
             _write_fake_settings(home)
             module, module_error = tool_cmd.load_user_toolbox_module(
-                module_path=home / ".pennyparse" / "user_toolbox.py"
+                module_path=home / ".ocragent" / "user_toolbox.py"
             )
             self.assertIsNone(module_error)
             self.assertIsNotNone(module)
@@ -222,11 +222,11 @@ class InitDocsTests(unittest.TestCase):
             env_without_chat = {key: "" for key in CHAT_ENV_KEYS}
             with (
                 mock.patch.dict(os.environ, env_without_chat),
-                mock.patch("pennyparse.cmd.init_docs._group_with_llm", return_value=None),
+                mock.patch("ocragent.cmd.init_docs._group_with_llm", return_value=None),
             ):
                 summary = init_docs.run_init_docs(overwrite=False, cwd=cwd, home=home)
 
-            result_file = cwd / ".pennyparse_memory.txt"
+            result_file = cwd / ".ocragent_memory.txt"
             memory = result_file.read_text(encoding="utf-8")
             rel_pdf = copied_pdf.relative_to(cwd).as_posix()
             rel_image = copied_image.relative_to(cwd).as_posix()
@@ -238,7 +238,7 @@ class InitDocsTests(unittest.TestCase):
             self.assertIn("start from", memory)
             self.assertIn(rel_pdf, memory)
             self.assertIn(rel_image, memory)
-            self.assertNotIn("pennyparse.log", memory)
+            self.assertNotIn("ocragent.log", memory)
 
             if importlib.util.find_spec("pymupdf") is not None:
                 self.assertIn("pdf", memory.lower())
@@ -258,11 +258,11 @@ class InitDocsTests(unittest.TestCase):
 
             with (
                 mock.patch.dict(os.environ, {key: "" for key in CHAT_ENV_KEYS}),
-                mock.patch("pennyparse.cmd.init_docs._group_with_llm", return_value=None),
+                mock.patch("ocragent.cmd.init_docs._group_with_llm", return_value=None),
             ):
                 summary = init_docs.run_init_docs(overwrite=False, cwd=cwd, home=home)
 
-            memory = (cwd / ".pennyparse_memory.txt").read_text(encoding="utf-8")
+            memory = (cwd / ".ocragent_memory.txt").read_text(encoding="utf-8")
             sampled_files = [
                 item
                 for group in summary["groups"]
@@ -394,14 +394,14 @@ TOOL_HANDLERS = {"demo_ocr": tool_demo_ocr}
         with tempfile.TemporaryDirectory() as cwd_raw, tempfile.TemporaryDirectory() as home_raw:
             cwd = Path(cwd_raw)
             home = Path(home_raw)
-            source = cwd / "pennyparse.toolbox_user.txt"
-            target = home / ".pennyparse" / "user_toolbox.py"
+            source = cwd / "ocragent.toolbox_user.txt"
+            target = home / ".ocragent" / "user_toolbox.py"
             target.parent.mkdir(parents=True)
             source.write_text("Tool: demo_ocr\n", encoding="utf-8")
 
             with (
-                mock.patch.dict(os.environ, {"PENNYPARSE_CHAT_MODEL": "unit-test-model"}),
-                mock.patch("pennyparse.agent.init_tools.ChatClient", FakeChatClient),
+                mock.patch.dict(os.environ, {"OCRAGENT_CHAT_MODEL": "unit-test-model"}),
+                mock.patch("ocragent.agent.init_tools.ChatClient", FakeChatClient),
             ):
                 summary = init_tools_agent.run_init_tools_agent(
                     cwd=cwd,
@@ -489,15 +489,15 @@ TOOL_HANDLERS = {"demo_parser": tool_demo_parser}
         with tempfile.TemporaryDirectory() as cwd_raw, tempfile.TemporaryDirectory() as home_raw:
             cwd = Path(cwd_raw)
             home = Path(home_raw)
-            source = cwd / "pennyparse.toolbox_user.txt"
-            target = home / ".pennyparse" / "user_toolbox.py"
+            source = cwd / "ocragent.toolbox_user.txt"
+            target = home / ".ocragent" / "user_toolbox.py"
             target.parent.mkdir(parents=True)
             source.write_text("Tool: demo_parser\n", encoding="utf-8")
 
             with (
-                mock.patch.dict(os.environ, {"PENNYPARSE_CHAT_MODEL": "unit-test-model"}),
-                mock.patch("pennyparse.agent.init_tools.ChatClient", FakeChatClient),
-                mock.patch("pennyparse.agent.init_tools.tempfile.TemporaryDirectory", TrackingTemporaryDirectory),
+                mock.patch.dict(os.environ, {"OCRAGENT_CHAT_MODEL": "unit-test-model"}),
+                mock.patch("ocragent.agent.init_tools.ChatClient", FakeChatClient),
+                mock.patch("ocragent.agent.init_tools.tempfile.TemporaryDirectory", TrackingTemporaryDirectory),
             ):
                 summary = init_tools_agent.run_init_tools_agent(
                     cwd=cwd,
@@ -532,8 +532,8 @@ TOOL_HANDLERS = {"demo_parser": tool_demo_parser}
         with tempfile.TemporaryDirectory() as cwd_raw, tempfile.TemporaryDirectory() as home_raw:
             cwd = Path(cwd_raw)
             home = Path(home_raw)
-            source = cwd / "pennyparse.toolbox_user.txt"
-            target = home / ".pennyparse" / "user_toolbox.py"
+            source = cwd / "ocragent.toolbox_user.txt"
+            target = home / ".ocragent" / "user_toolbox.py"
             target.parent.mkdir(parents=True)
             source.write_text(
                 "siliconflow_deepseekocr\nAuthorization: Bearer $SILICONFLOW_API_KEY\n",
@@ -541,8 +541,8 @@ TOOL_HANDLERS = {"demo_parser": tool_demo_parser}
             )
 
             with (
-                mock.patch.dict(os.environ, {"PENNYPARSE_CHAT_MODEL": "unit-test-model"}),
-                mock.patch("pennyparse.agent.init_tools.ChatClient", FailingChatClient),
+                mock.patch.dict(os.environ, {"OCRAGENT_CHAT_MODEL": "unit-test-model"}),
+                mock.patch("ocragent.agent.init_tools.ChatClient", FailingChatClient),
             ):
                 summary = init_tools_agent.run_init_tools_agent(
                     cwd=cwd,
@@ -579,9 +579,9 @@ class InitCliTests(unittest.TestCase):
                     "ok": True,
                     "tools": {
                         "ok": True,
-                        "result_file": str(home / ".pennyparse" / "user_toolbox.py"),
+                        "result_file": str(home / ".ocragent" / "user_toolbox.py"),
                     },
-                    "docs": {"ok": True, "result_file": str(cwd / ".pennyparse_memory.txt")},
+                    "docs": {"ok": True, "result_file": str(cwd / ".ocragent_memory.txt")},
                 }
 
             def fake_resolve(entrypoint):
@@ -594,7 +594,7 @@ class InitCliTests(unittest.TestCase):
                 with (
                     mock.patch.dict(
                         os.environ,
-                        {"HOME": str(home), "PENNYPARSE_CHAT_MODEL": "unit-test-model"},
+                        {"HOME": str(home), "OCRAGENT_CHAT_MODEL": "unit-test-model"},
                     ),
                     mock.patch.object(cli_module, "resolve_entrypoint", side_effect=fake_resolve),
                 ):
@@ -624,7 +624,7 @@ class InitCliTests(unittest.TestCase):
 
             def fake_run_init_tools(**kwargs):
                 calls.append(kwargs)
-                return {"ok": True, "result_file": str(home / ".pennyparse" / "user_toolbox.py")}
+                return {"ok": True, "result_file": str(home / ".ocragent" / "user_toolbox.py")}
 
             def fake_resolve(entrypoint):
                 self.assertEqual(entrypoint, cli_module._INIT_TOOLS_ENTRYPOINT)
@@ -636,7 +636,7 @@ class InitCliTests(unittest.TestCase):
                 with (
                     mock.patch.dict(
                         os.environ,
-                        {"HOME": str(home), "PENNYPARSE_CHAT_MODEL": "unit-test-model"},
+                        {"HOME": str(home), "OCRAGENT_CHAT_MODEL": "unit-test-model"},
                     ),
                     mock.patch.object(cli_module, "resolve_entrypoint", side_effect=fake_resolve),
                 ):
@@ -674,7 +674,7 @@ class ReviewerTests(unittest.TestCase):
     def test_reviewer_pass_preserves_full_text_after_truncated_audit(self) -> None:
         with tempfile.TemporaryDirectory() as cwd_raw, tempfile.TemporaryDirectory() as home_raw:
             cwd = Path(cwd_raw)
-            (cwd / "pennyparse.settings.toml").write_text(
+            (cwd / "ocragent.settings.toml").write_text(
                 "[reviewer]\nmax_length = 5\n",
                 encoding="utf-8",
             )
@@ -699,8 +699,8 @@ class ReviewerTests(unittest.TestCase):
                     }
 
             with (
-                mock.patch.dict(os.environ, {"PENNYPARSE_CHAT_MODEL": "unit-test-model"}),
-                mock.patch("pennyparse.agent.reviewer.ChatClient", FakeChatClient),
+                mock.patch.dict(os.environ, {"OCRAGENT_CHAT_MODEL": "unit-test-model"}),
+                mock.patch("ocragent.agent.reviewer.ChatClient", FakeChatClient),
             ):
                 outcome = reviewer_agent.review_text(
                     "abcdeFULL_SUFFIX",
@@ -715,7 +715,7 @@ class ReviewerTests(unittest.TestCase):
     def test_reviewer_minor_revision_applies_patch_to_full_text(self) -> None:
         with tempfile.TemporaryDirectory() as cwd_raw, tempfile.TemporaryDirectory() as home_raw:
             cwd = Path(cwd_raw)
-            (cwd / "pennyparse.settings.toml").write_text(
+            (cwd / "ocragent.settings.toml").write_text(
                 "[reviewer]\nmax_length = 8\n",
                 encoding="utf-8",
             )
@@ -748,8 +748,8 @@ class ReviewerTests(unittest.TestCase):
                     }
 
             with (
-                mock.patch.dict(os.environ, {"PENNYPARSE_CHAT_MODEL": "unit-test-model"}),
-                mock.patch("pennyparse.agent.reviewer.ChatClient", FakeChatClient),
+                mock.patch.dict(os.environ, {"OCRAGENT_CHAT_MODEL": "unit-test-model"}),
+                mock.patch("ocragent.agent.reviewer.ChatClient", FakeChatClient),
             ):
                 outcome = reviewer_agent.review_text(
                     "teh head\nbody beyond audit limit\n",
@@ -780,8 +780,8 @@ class ReviewerTests(unittest.TestCase):
                     }
 
             with (
-                mock.patch.dict(os.environ, {"PENNYPARSE_CHAT_MODEL": "unit-test-model"}),
-                mock.patch("pennyparse.agent.reviewer.ChatClient", FakeChatClient),
+                mock.patch.dict(os.environ, {"OCRAGENT_CHAT_MODEL": "unit-test-model"}),
+                mock.patch("ocragent.agent.reviewer.ChatClient", FakeChatClient),
             ):
                 outcome = reviewer_agent.review_text(
                     "complete parser text",
@@ -867,8 +867,8 @@ class ReviewerTests(unittest.TestCase):
                     }
 
             with (
-                mock.patch.dict(os.environ, {"PENNYPARSE_CHAT_MODEL": "unit-test-model"}),
-                mock.patch("pennyparse.agent.reviewer.ChatClient", FakeChatClient),
+                mock.patch.dict(os.environ, {"OCRAGENT_CHAT_MODEL": "unit-test-model"}),
+                mock.patch("ocragent.agent.reviewer.ChatClient", FakeChatClient),
             ):
                 outcome = reviewer_agent.review_text(
                     "aa",
@@ -951,7 +951,7 @@ class ParserTests(unittest.TestCase):
 
             output_file = Path(result.output_file)
             output_text = output_file.read_text(encoding="utf-8")
-            page_dir = cwd / "out" / ".pennyparse_pages" / "blank.pdf"
+            page_dir = cwd / "out" / ".ocragent_pages" / "blank.pdf"
 
             self.assertTrue(result.ok)
             self.assertTrue(result.tool.startswith("pdf_pages_to_images"))
@@ -980,7 +980,7 @@ class RunCommandTests(unittest.TestCase):
             home = Path(home_raw)
             _write_fake_user_toolbox(home)
             _write_parser_batch_settings(cwd, 1)
-            memory_path = cwd / ".pennyparse_memory.txt"
+            memory_path = cwd / ".ocragent_memory.txt"
             memory_path.write_text("initial memory\n", encoding="utf-8")
             first = cwd / "a.txt"
             second = cwd / "b.txt"
@@ -1011,7 +1011,7 @@ class RunCommandTests(unittest.TestCase):
             home = Path(home_raw)
             _write_fake_user_toolbox(home)
             _write_ignore_txt_settings(cwd)
-            memory_path = cwd / ".pennyparse_memory.txt"
+            memory_path = cwd / ".ocragent_memory.txt"
             memory_path.write_text("initial memory\n", encoding="utf-8")
             (cwd / "notes.txt").write_text("ignore me\n", encoding="utf-8")
             (cwd / "report.pdf").write_text("parse me\n", encoding="utf-8")
@@ -1098,7 +1098,7 @@ class ToolCallsLoopTests(unittest.TestCase):
                 return message
 
         client = FakeClient()
-        with mock.patch("pennyparse.utils_aigc.time.sleep"):
+        with mock.patch("ocragent.utils_aigc.time.sleep"):
             result = utils_aigc.run_tool_calls_loop(
                 client,
                 session,

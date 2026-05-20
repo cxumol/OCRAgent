@@ -1,17 +1,17 @@
 # Developer Guide
 
-PennyParse is a small Python CLI with agent-assisted edges. Development is easiest when the code keeps the same split as the runtime: deterministic command code owns contracts; agents supply judgment behind those contracts.
+OCRAgent is a small Python CLI with agent-assisted edges. Development is easiest when the code keeps the same split as the runtime: deterministic command code owns contracts; agents supply judgment behind those contracts.
 
 The project is about graded parsing. Cheap text extraction, local OCR, remote OCR, VLMs, and multimodal LLMs should not be treated as one interchangeable bucket. Code changes should preserve that routing discipline: inspect cheaply, spend carefully, review before writing.
 
-![PennyParse system architecture](assets/PennyParse-System-Architecture-detailed-en.jpg)
+![OCRAgent system architecture](assets/OCRAgent-System-Architecture-detailed-en.jpg)
 
 ## Environment
 
 Use the locked project environment:
 
 ```shell
-uv run pennyparse --help
+uv run ocragent --help
 ```
 
 <details>
@@ -21,7 +21,7 @@ uv run pennyparse --help
 python -m venv .venv
 . .venv/bin/activate
 python -m pip install -e ".[full]"
-pennyparse --help
+ocragent --help
 ```
 
 </details>
@@ -30,32 +30,32 @@ Enable optional backends only when a task needs them:
 
 ```shell
 uv run --extra pdf python -m unittest discover -s tests
-uv run --extra docx pennyparse tool --list
+uv run --extra docx ocragent tool --list
 ```
 
 For end-to-end checks that need chat settings, put them in `.env` or export them:
 
 ```shell
-PENNYPARSE_CHAT_BASE=http://localhost:8080/v1
-PENNYPARSE_CHAT_MODEL=your-model
-PENNYPARSE_CHAT_AUTHKEY=your-key
+OCRAGENT_CHAT_BASE=http://localhost:8080/v1
+OCRAGENT_CHAT_MODEL=your-model
+OCRAGENT_CHAT_AUTHKEY=your-key
 ```
 
 ## Code Map
 
-- `src/pennyparse/cli.py`: Typer command boundary and stream handling.
-- `src/pennyparse/config.py`: layered settings, `.env`, and environment overrides.
-- `src/pennyparse/cmd/`: command implementations for init, tools, and run.
-- `src/pennyparse/agent/`: model-facing loops for tool generation, parsing, and review.
-- `src/pennyparse/_client.py`: OpenAI-compatible chat-completions client with a 1234 second default request timeout.
-- `src/pennyparse/utils_aigc.py`: shared retry and tool-call loop helpers.
+- `src/ocragent/cli.py`: Typer command boundary and stream handling.
+- `src/ocragent/config.py`: layered settings, `.env`, environment overrides, and `load_ocra_config`.
+- `src/ocragent/cmd/`: command implementations for init, tools, and run.
+- `src/ocragent/agent/`: model-facing loops for tool generation, parsing, and review.
+- `src/ocragent/_client.py`: OpenAI-compatible chat-completions client with a 1234 second default request timeout.
+- `src/ocragent/utils_aigc.py`: shared retry and tool-call loop helpers.
 - `tests/`: dynamic unit tests and manual end-to-end script.
 
 ## Local State In Tests
 
-Runtime code reads `${HOME}/.pennyparse/user_toolbox.py` and `./.pennyparse_memory.txt`. Tests should isolate both `HOME` and `cwd` with temporary directories. Do not depend on repository demo assets by name; discover suitable files by type, or skip optional assertions when their backend is absent.
+Runtime code reads `${HOME}/.ocragent/user_toolbox.py` and `./.ocragent_memory.txt`. Tests should isolate both `HOME` and `cwd` with temporary directories. Do not depend on repository demo assets by name; discover suitable files by type, or skip optional assertions when their backend is absent.
 
-`init tools` validates generated handlers with demo assets packaged under `pennyparse/demo_assets/`. The validation copies those files into a temporary working directory, runs handlers from that directory, points `TMPDIR`, `TEMP`, and `TMP` there, and removes the directory on normal exit.
+`init tools` validates generated handlers with demo assets packaged under `ocragent/demo_assets/`. The validation copies those files into a temporary working directory, runs handlers from that directory, points `TMPDIR`, `TEMP`, and `TMP` there, and removes the directory on normal exit.
 
 ## Verification
 
@@ -79,7 +79,7 @@ tests/e2e.sh -d _test_playground
 ```
 
 The script uses the chosen directory as both `HOME` and `cwd`, copies test inputs, runs the real CLI flow, and prints commands, exit codes, generated memory, output previews, and log tails.
-It copies repository-local runtime inputs when present: `.env`, `pennyparse.settings.toml`, `.pennyparse/pennyparse.settings.toml`, `pennyparse.toolbox_user.txt`, and files under `demo_assets/`.
+It copies repository-local runtime inputs when present: `.env`, `ocragent.settings.toml`, `.ocragent/ocragent.settings.toml`, `ocragent.toolbox_user.txt`, and files under `demo_assets/`.
 
 ## Release To PyPI
 
@@ -121,20 +121,20 @@ When a code change affects behavior, update the relevant document under `docs/` 
 
 ## Debugging
 
-Start with `pennyparse.log`. It records unavailable tools, validation failures, skipped optional dependencies, parser tool failures, and review fallback reasons.
+Start with `ocragent.log`. It records unavailable tools, validation failures, skipped optional dependencies, parser tool failures, and review fallback reasons.
 
 For tool issues, inspect discovery first:
 
 ```shell
-pennyparse tool --list
-pennyparse tool <toolname> --help
+ocragent tool --list
+ocragent tool <toolname> --help
 ```
 
 For initialization issues, inspect the generated state files:
 
 ```text
-${HOME}/.pennyparse/user_toolbox.py
-./.pennyparse_memory.txt
+${HOME}/.ocragent/user_toolbox.py
+./.ocragent_memory.txt
 ```
 
 For agent issues, reduce the problem to the loop contract: what messages entered, what tool call or code block came back, what deterministic validator rejected, and whether the failure was fed back into the next turn.

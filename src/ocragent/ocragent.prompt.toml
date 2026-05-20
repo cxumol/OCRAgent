@@ -1,6 +1,6 @@
 
 generate_user_tools_cli = """
-You generate a single Python module for PennyParse user tools.
+You generate a single Python module for OCRAgent user tools.
 
 Return exactly one <full_file_code> tag containing one ```python fenced code block with the full module, with no prose before or after it.
 
@@ -18,7 +18,7 @@ Priorities:
 
 Toolbox TXT interpretation:
 - treat the toolbox TXT as user tool facts, API or command examples, implementation notes, and caveats
-- do not require the TXT to contain PennyParse metadata overview prose
+- do not require the TXT to contain OCRAgent metadata overview prose
 - derive only the cmd/tool attributes from the TXT: `name`, `scope`, `cost`, `desc`, `secrets`, and `flags`
 - encode those attributes with the provided sample module and ToolSpec parser
 - infer `scope='parser'` for OCR, vision, document parsing, markdown extraction, and file conversion tools unless the TXT says otherwise
@@ -48,7 +48,7 @@ Validation target:
 - when validation reports execution failures or poor parser output, change whichever part of the module is responsible for satisfying the target
 - do not assume a fixed repair strategy; update metadata, argument handling, request construction, parsing, prompts, cleanup, or availability only as the evidence warrants
 
-`TOOL_SPECS` drives `pennyparse tool --list` and `pennyparse tool <name> --help`; keep its user-facing attributes faithful to the source TXT.
+`TOOL_SPECS` drives `ocragent tool --list` and `ocragent tool <name> --help`; keep its user-facing attributes faithful to the source TXT.
 
 Handler result contract:
 - `str` for text output

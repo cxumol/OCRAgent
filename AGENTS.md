@@ -12,16 +12,16 @@ warn: 此文件对于 AI Agent 只读, 禁止 AI Agent 修改此文件
 ## 架构
 
 AI Agent: 负责实现 Agentic 迭代循环
-CLI: 各项功能的主入口 `pennyparse <sub_command> <more_args>`, 其中部分工具可递归调用
-Skill:  PennyParse 可封装为 Skill 被其它 Agent 调用 (计划中, 尚未实现) 
+CLI: 各项功能的主入口 `ocragent <sub_command> <more_args>`, 其中部分工具可递归调用
+Skill:  OCRAgent 可封装为 Skill 被其它 Agent 调用 (计划中, 尚未实现) 
 
 ## User Flow
 
 ```shell
-pennyparse init tools [args]
+ocragent init tools [args]
 cd /path/to/my_docs
-pennyparse init docs [args]
-pennyparse run [args]
+ocragent init docs [args]
+ocragent run [args]
 ```
 
 ## CLI
@@ -37,8 +37,8 @@ pennyparse run [args]
 
 优先次序: 
 - 环境变量
-- `${CWD}/pennyparse.settings.toml`
-- `${HOME}/.pennyparse/pennyparse.settings.toml`
+- `${CWD}/ocragent.settings.toml`
+- `${HOME}/.ocragent/ocragent.settings.toml`
 - package default
 
 环境变量 / argv 两者仅用其一, 即环境变量不可作为 argv 传递, 反之亦然; 原则上, 环境变量用于长期有效的内容, argv 用于需要实时变化的内容
@@ -46,14 +46,14 @@ pennyparse run [args]
 
 config.py 可以通过  python-dotenv 从 .env 文件中读取环境变量
 
-`pennyparse.settings.default.toml`
-前身为 pennyparse.settings.default.ini, 重构时无需考虑兼容 ini
+`ocragent.settings.default.toml`
+前身为 ocragent.settings.default.ini, 重构时无需考虑兼容 ini
 
-`pennyparse.prompt.toml`
-- 导入为 pp_agentic_prompt, 按应用场景分组
-- 短且与函数强绑定的 prompt 可内联；跨 agent、需要调参或复用的 prompt 放入 `pennyparse.prompt.toml`
+`ocragent.prompt.toml`
+- 导入为 ocra_agentic_prompt, 按应用场景分组
+- 短且与函数强绑定的 prompt 可内联；跨 agent、需要调参或复用的 prompt 放入 `ocragent.prompt.toml`
 
-如果用户未提供 PENNYPARSE_CHAT_*, 则需要提醒用户: PENNYPARSE_CHAT_*需要自行配置, 否则 PennyParse 可能无法正常工作 
+如果用户未提供 OCRAGENT_CHAT_*, 则需要提醒用户: OCRAGENT_CHAT_*需要自行配置, 否则 OCRAgent 可能无法正常工作 
 
 ### cmd/init
 
@@ -61,38 +61,38 @@ config.py 可以通过  python-dotenv 从 .env 文件中读取环境变量
 
 ### cmd/init_tools
 
-`pennyparse init tools --from [Usertool_txt_path][default=$HOME/pennyparse.toolbox_user.txt]`
+`ocragent init tools --from [Usertool_txt_path][default=$HOME/ocragent.toolbox_user.txt]`
 
-- 检查 `${HOME}/.pennyparse/user_toolbox.py` 是否存在
-  + 如果已有则询问覆盖, `-f` 强制覆盖, 默认否 (y/N), 超时(PENNYPARSE_CLI_TIMEOUT)自动选默认, 即终止流程
+- 检查 `${HOME}/.ocragent/user_toolbox.py` 是否存在
+  + 如果已有则询问覆盖, `-f` 强制覆盖, 默认否 (y/N), 超时(OCRAGENT_CLI_TIMEOUT)自动选默认, 即终止流程
 - 调用 agent/init_tools
-- 返回成功示例 (内部表示为 python dict, 如需输出则json.dumps): `{"ok":True, "usertools_valid":["tool1", "tool2"], "usertools_failed":["tool3"], "agent_turns": 3, "result_file":"/home/ubuntu/.pennyparse/user_toolbox.py"}`
+- 返回成功示例 (内部表示为 python dict, 如需输出则json.dumps): `{"ok":True, "usertools_valid":["tool1", "tool2"], "usertools_failed":["tool3"], "agent_turns": 3, "result_file":"/home/ubuntu/.ocragent/user_toolbox.py"}`
 - 警告用户需要自行审计 user_toolbox.py 的安全风险
 
 ### cmd/init_docs
 
-`pennyparse init docs`
+`ocragent init docs`
 
-- 检查 `${HOME}/.pennyparse/user_toolbox.py` 是否存在
+- 检查 `${HOME}/.ocragent/user_toolbox.py` 是否存在
   + 如果不存在, 则提醒用户先运行 init tools, 然后终止流程
-- 检查 `./.pennyparse_memory.txt` 是否存在
-  + 如果已有则询问覆盖, `-f` 强制覆盖, 默认否 (y/N), 超时(PENNYPARSE_CLI_TIMEOUT)自动选默认, 即终止流程
-- 检查 pp_config["aigc.api.chatcomp"] 是否已配置好, 否则终止流程
+- 检查 `./.ocragent_memory.txt` 是否存在
+  + 如果已有则询问覆盖, `-f` 强制覆盖, 默认否 (y/N), 超时(OCRAGENT_CLI_TIMEOUT)自动选默认, 即终止流程
+- 检查 ocra_config["aigc.api.chatcomp"] 是否已配置好, 否则终止流程
 - Walk 遍历所有子目录, 子文件, 获取待解析的文件名及文件体积
-- 通过 `pennyparse tool --list --scope=previewer` 找到可用的工具, 提取对应文件的元数据, 合并到文件列表元数据中
+- 通过 `ocragent tool --list --scope=previewer` 找到可用的工具, 提取对应文件的元数据, 合并到文件列表元数据中
   + 如果 pdf 的 planner 阶段工具可用, 则可根据页码数和文件体积推测 pdf 是否为影印版
 - 让 LLM 根据给出全部的文件路径和元数据, 通过 tool_calls 协议给出 glob 格式的匹配模式来分组, 分组依据为 LLM 从文件名和元数据推测出的文档解析难度
   + 约束 glob: 必须相对路径、不得跨目录、不得匹配隐藏目录、不得冲突
 - LLM 拿到 glob 匹配结果, 可以适当调整 glob 匹配模式或确定已有 glob 匹配模式无误, 然后将未匹配的作为 misc 组
-- 按照 pp_config["init.sampling"] 中的数字, 对每组进行抽样解析
+- 按照 ocra_config["init.sampling"] 中的数字, 对每组进行抽样解析
 - 抽样规则
-  + 对于 pdf 文件, 每个 pdf 按页数抽样, 提取该页(文字层/该页截图)到临时文件夹, 直到 pp_config["init.sampling"]["pdf_page_total_max"]
+  + 对于 pdf 文件, 每个 pdf 按页数抽样, 提取该页(文字层/该页截图)到临时文件夹, 直到 ocra_config["init.sampling"]["pdf_page_total_max"]
   + 对于图像文件, 按文件数抽样
   + 对于其他文件, 暂且跳过 (留出日后增加支持更多文件类型的余地) 
-- 抽检过程 按 pp_config["aigc.api.chatcomp"]["model_hasVision"] 分为两种
+- 抽检过程 按 ocra_config["aigc.api.chatcomp"]["model_hasVision"] 分为两种
   + 不具备视觉的, 按普通 OCR (或者其余 `tool if tool.cost in ["very low","low"]`) 抽取, pdf 先尝试抽取文字层, 如果文字层不存在再尝试 OCR, 然后文字发往 LLM 令其判断文字结果是否通顺, 是否含有图表等 OCR 难以应付的内容
-  + 具备视觉的, 先 `pennyparse tool img_thumb` 生成缩略图, 再让 VLM 看缩略图判断清晰程度､ 印刷/手写､ 扫描清晰度､ 纯文字段落/含有图表､ 复杂排版等情况
-- 写入 `./.pennyparse_memory.txt`
+  + 具备视觉的, 先 `ocragent tool img_thumb` 生成缩略图, 再让 VLM 看缩略图判断清晰程度､ 印刷/手写､ 扫描清晰度､ 纯文字段落/含有图表､ 复杂排版等情况
+- 写入 `./.ocragent_memory.txt`
   + 用自然语言分别总结每组文件的文件名特征, 对文档解析难度的估算, 以及建议以哪个 cost 基线作为开始 (每组一句话) 
   + 根据所有分组抽检情况, 用自然语言总结当前文件夹文档的总体难度估算, 以及建议总体上从哪个 cost 作为基线作为开始
 
@@ -107,27 +107,27 @@ tool 实例属性
 - secrets:List[str], 调用本工具需要引用的环境变量, 例如, DEEPSEEK_API_KEY, etc.
 - flags:Dict[str, str], 调用本工具需要传入的参数, 例如, --path /path/to/example.jpg 即 {"path": "/path/to/example.jpg", ...} 为多数 scope==parser 工具所须
 
-tool 分为 cmd/tool 的内建工具, 以及 cmd/init_tools 构建的用户工具, 用户工具在每次运行 cmd/tool 时, 从 `$HOME/.pennyparse/user_toolbox.py` 动态导入; 
+tool 分为 cmd/tool 的内建工具, 以及 cmd/init_tools 构建的用户工具, 用户工具在每次运行 cmd/tool 时, 从 `$HOME/.ocragent/user_toolbox.py` 动态导入; 
 内建工具又根据是否具备 pymupdf, pypandoc 等依赖, 设置工具的可用状态
-如果 `$HOME/.pennyparse/user_toolbox.py` 不存在/导入错误, 则仅显示可用的内建工具
+如果 `$HOME/.ocragent/user_toolbox.py` 不存在/导入错误, 则仅显示可用的内建工具
 
 命令行列出所有可用工具
-`pennyparse tool --list` 
+`ocragent tool --list` 
 输出为
 `'\n\n'.join([f"{tool.__name__}\tscope: {tool.scope} cost: {tool.cost}\t{tool.desc}\n\t" + '\n\t'.join([f'--{k} {v}' for k, v in tool.flags.items()]) for tool in all_tools if tool.enabled])`
 
-可指定 scope `pennyparse tool --list --scope=parser` 
+可指定 scope `ocragent tool --list --scope=parser` 
 输出为
 `'\n\n'.join([f"{tool.__name__}\tscope: {tool.scope} cost: {tool.cost}\t{tool.desc}\n\t" + '\n\t'.join([f'--{k} {v}' for k, v in tool.flags.items()]) for tool in all_tools if tool.enabled and tool.scope=='parser'])`
 
 ### cmd/run
 
-`pennyparse run [--out-dir pennyparse_results]`
+`ocragent run [--out-dir ocragent_results]`
 
 - 检查前期初始化工作是否齐备, 是否有对应文件生成
 - 读取每个文档文件的路径, 依次提交给 agent/parser
-- 每解析完 pp_config["parser_summary_batch"] 份文件, 就让 LLM 20字以内概述这批文件的文件名和解析所用工具, 追加到 .pennyparse_memory.txt, 为后续 agent/parser 选取工具当作参考
-- 统计输出文件夹中的文件, 并将统计结果汇总为汇报形式, 追加到 .pennyparse_memory.txt
+- 每解析完 ocra_config["parser_summary_batch"] 份文件, 就让 LLM 20字以内概述这批文件的文件名和解析所用工具, 追加到 .ocragent_memory.txt, 为后续 agent/parser 选取工具当作参考
+- 统计输出文件夹中的文件, 并将统计结果汇总为汇报形式, 追加到 .ocragent_memory.txt
 
 ## Agent
 
@@ -151,7 +151,7 @@ agent/*.py 可以根据各自源文件顶部常量 _AGENT_IMPL_MODE 来切换 to
 
 Agent 语境下, 交互形式应偏向自然语言, 而非形式逻辑语言
 
-### $CWD/.pennyparse_memory.txt
+### $CWD/.ocragent_memory.txt
 
 - 文件权限控制: 常规运行时, 文件打开模式仅限 'r', 'a'; 唯一例外: 初始化时, 用户要求覆盖此文件
 
@@ -161,16 +161,16 @@ prompt 需要注入: `$usertool_txt_path`, `cmd/tool.py`
 
 Agentic 循环模式: pseudo_XML
 
-- 调用 LLM 写脚本: 让 LLM 写出 `$HOME/.pennyparse/user_toolbox.py`, 要求包含符合 `cmd/tool` 范式, 且可被 `cmd/tool` 动态导入
+- 调用 LLM 写脚本: 让 LLM 写出 `$HOME/.ocragent/user_toolbox.py`, 要求包含符合 `cmd/tool` 范式, 且可被 `cmd/tool` 动态导入
 - 校验: 生成 user_toolbox.py 后拿 demo_assets 尝试运行, 根据preliminary解析结果让 LLM 分析要不要调整/如何调整 user_toolbox.py 相关代码 (若网络不通则跳过校验且默认可用) 
 - 自修复循环: 根据解析结果, 迭代更新 user_toolbox.py 直到 user_toolbox.py 可被动态导入和校验, 或达到 max_iter
 
-在此过程中, 需要配合 `$HOME/.pennyparse/user_toolbox.py` 文件的写入与运行 subprocess.run(['sys.executable',...],...)
+在此过程中, 需要配合 `$HOME/.ocragent/user_toolbox.py` 文件的写入与运行 subprocess.run(['sys.executable',...],...)
 
 > 校验自修复循环举例: 例一: 某OCR解析结果, 发现正文中混入形如 <bbox>[[44, 395, 277, 471]]</bbox> 等非文档本身的内容, 则增加去除它们的后处理步骤; 例二: 某 VLM 结果中混入了"好的, 这个图片中包含了一份资料, 资料上写的内容是: blah blah", 则需要调整 VLM 的 prompt, 以及增加后处理步骤, 比如下次迭代中让 VLM prompt 要求解析内容用 <doc_fulltext> </doc_fulltext> 包裹, 然后增加 re findall "<doc_fulltext>(.*?)</doc_fulltext>" 的后处理;
 > 以上仅供举例, 实现上应当由 Agent 自己决定如何改 metadata、调用方式、prompt、解析、清洗或禁用工具
 
-> 如果提供的是像 Qwen-VL, Gemini, 这类多模态 VLM 用作 parser, 则需要将事先定义在 pennyparse.prompt.toml 中的 VLM_prompt 导入到 user_toolbox.py 的对应过程中｡ VLM_prompt 应当包括任务指令和格式引导, 格式引导: 默认 markdown, 但在带有表格/复杂排版情况下时, 则对应部分用 HTML 表示
+> 如果提供的是像 Qwen-VL, Gemini, 这类多模态 VLM 用作 parser, 则需要将事先定义在 ocragent.prompt.toml 中的 VLM_prompt 导入到 user_toolbox.py 的对应过程中｡ VLM_prompt 应当包括任务指令和格式引导, 格式引导: 默认 markdown, 但在带有表格/复杂排版情况下时, 则对应部分用 HTML 表示
 
 ### agent/parser
 
@@ -179,15 +179,15 @@ Agentic 循环模式: tool_calls
 - 用于处理待解析的单个文档
 - 每个文档具有独立的上下文
 
-- 读取 `pennyparse tool --list --scope=parser` 以了解有哪些解析工具可供使用
-- 读取 .pennyparse_memory.txt 并根据其中的预检结果, 选取适合本文件的解析工具
+- 读取 `ocragent tool --list --scope=parser` 以了解有哪些解析工具可供使用
+- 读取 .ocragent_memory.txt 并根据其中的预检结果, 选取适合本文件的解析工具
 - 调用解析工具进行解析
 - 调用 agent/reviewer 对解析结果进行验收
 - 验收不过的情况下, 换一个解析工具进行解析
 - 不以规则强制, 而是由prompt引导, 让 LLM 自行判断换到哪个工具
   - 对于图片文件, 建议agent在相同成本的档位尝试1-2次 
   - 对于 PDF, 建议 agent 先尝试直接按 PDF 解析, 如果验收不过, 再按页拆成每页一幅图 (调用 pdf 拆成图的 tool), 按页来解析 (此时递归以图片文件形式调用 agent) 
-- 验收通过, 则往 ./<pennyparse_results>/ 输出解析结果, 其中输出文件名后缀由 LLM 根据 pp_config["output"]["ext"] 自行决定
+- 验收通过, 则往 ./<ocragent_results>/ 输出解析结果, 其中输出文件名后缀由 LLM 根据 ocra_config["output"]["ext"] 自行决定
 
 ### agent/reviewer
 
@@ -197,7 +197,7 @@ Agentic 循环模式: tool_calls
 - agent/reviewer 具有独立的上下文和提示词, 免受 agent/parser 分析过程的干扰
 
 - LLM 自行判断给出的文字是否通顺, 排版是否完整 (此 Agent 的 prompt 应赋予严谨细致审慎的性格) 
-- context 管理: 超过  pp_config["output"]["max_length"] 的, 则截断到 pp_config["output"]["max_length"] 位置再注入 prompt
+- context 管理: 超过  ocra_config["output"]["max_length"] 的, 则截断到 ocra_config["output"]["max_length"] 位置再注入 prompt
 - 自修复循环: 生成 `re.sub()` 形式的 myregexpatch 来修复文本, 可以 `re.sub()` 多次, 形成修复链; apply myregexpatch 得到修改结果后再检查反馈给 LLM 继续修复
   + 注意 `re.sub()` 形式的替换容易出错, 因此应该在 LLM 反馈的修改结果中, 包含修复前后的文本长度
   + 每次生成/Apply的 myregexpatch 都是针对本 Agent 接收到的初始文本, 而非上一次的修改结果
@@ -261,7 +261,7 @@ for _ in range(int(aigc.agent.max_iter)):
 ## logger
 
 - console handler 指向 stderr
-- file handler 指向 `${CWD}/pennyparse.log`
+- file handler 指向 `${CWD}/ocragent.log`
 - log format 带模块名或文件名
 - 若从环境变量中注入了 secrets, 须脱敏
 

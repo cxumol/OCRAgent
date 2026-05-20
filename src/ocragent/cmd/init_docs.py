@@ -7,7 +7,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any, Mapping
 
 from .._client import ChatClient, ChatSession
-from ..config import ensure_user_state_dir, get_init_ignore_config, get_user_toolbox_path, load_pp_config
+from ..config import ensure_user_state_dir, get_init_ignore_config, get_user_toolbox_path, load_ocra_config
 from ..logger import get_logger
 from ..utils import extract_md_codeblock
 from . import tool as tool_cmd
@@ -32,19 +32,19 @@ def run_init_docs(
 
     toolbox_path = get_user_toolbox_path(home=home)
     if not toolbox_path.exists():
-        raise RuntimeError(f"{toolbox_path} not found. Run `pennyparse init tools` first.")
+        raise RuntimeError(f"{toolbox_path} not found. Run `ocragent init tools` first.")
 
-    result_path = cwd / ".pennyparse_memory.txt"
+    result_path = cwd / ".ocragent_memory.txt"
     if result_path.exists() and not overwrite:
         raise RuntimeError(f"refused to overwrite existing {result_path}")
 
-    pp_cfg = load_pp_config(cwd=cwd, home=home)
-    chat_settings = _chat_settings(pp_cfg)
+    ocra_cfg = load_ocra_config(cwd=cwd, home=home)
+    chat_settings = _chat_settings(ocra_cfg)
     if not chat_settings.get("model"):
         raise RuntimeError("chat model is not configured")
 
-    ignore_ext, ignore_folder = get_init_ignore_config(pp_cfg)
-    sampling_cfg = _as_mapping(_as_mapping(pp_cfg.get("init")).get("sampling"))
+    ignore_ext, ignore_folder = get_init_ignore_config(ocra_cfg)
+    sampling_cfg = _as_mapping(_as_mapping(ocra_cfg.get("init")).get("sampling"))
 
     tools = _discover_tools(cwd=cwd, home=home, logger=logger)
     files = _walk_files(cwd=cwd, ignore_ext=ignore_ext, ignore_folder=ignore_folder)
@@ -78,8 +78,8 @@ def _as_mapping(value: Any) -> Mapping[str, Any]:
     return value if isinstance(value, Mapping) else {}
 
 
-def _chat_settings(pp_cfg: Mapping[str, Any]) -> dict[str, Any]:
-    chat = _as_mapping(_as_mapping(_as_mapping(pp_cfg.get("aigc")).get("api")).get("chatcomp"))
+def _chat_settings(ocra_cfg: Mapping[str, Any]) -> dict[str, Any]:
+    chat = _as_mapping(_as_mapping(_as_mapping(ocra_cfg.get("aigc")).get("api")).get("chatcomp"))
     base_url = str(chat.get("base") or "").strip()
     model = str(chat.get("model") or "").strip()
     if not base_url:
@@ -117,7 +117,7 @@ def _walk_files(*, cwd: Path, ignore_ext: set[str], ignore_folder: set[str]) -> 
             if filename.startswith("."):
                 continue
             path = root_path / filename
-            if root_path == cwd and filename == "pennyparse.log":
+            if root_path == cwd and filename == "ocragent.log":
                 continue
             if not path.is_file():
                 continue

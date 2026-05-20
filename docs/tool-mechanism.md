@@ -1,14 +1,14 @@
 # Tool Mechanism
 
-Tools are PennyParse's execution contract. They put local binaries, Python libraries, and remote APIs behind one CLI-shaped interface, so agents can reason about capability, cost, and scope without knowing each backend.
+Tools are OCRAgent's execution contract. They put local binaries, Python libraries, and remote APIs behind one CLI-shaped interface, so agents can reason about capability, cost, and scope without knowing each backend.
 
 ## Public Commands
 
 ```shell
-pennyparse tool --list
-pennyparse tool --list --scope=parser
-pennyparse tool <toolname> --help
-pennyparse tool <toolname> [args...]
+ocragent tool --list
+ocragent tool --list --scope=parser
+ocragent tool <toolname> --help
+ocragent tool <toolname> [args...]
 ```
 
 The stream rule is simple: tool results go to `stdout`; logs and errors go to `stderr`. Text tools print text, JSON tools print JSON, and binary tools write bytes. List output contains only available tools and includes each tool's flags.
@@ -56,15 +56,15 @@ The builtin set covers low-cost inspection and common document parsing:
 
 Optional dependencies affect availability, not discovery. A missing PDF or Pandoc backend makes the affected tool unavailable with a reason; it does not remove the tool from the model the parser can reason about.
 
-When the PDF and Pandoc backends are installed, `pennyparse tool --list --scope=parser` includes `pdf2txt`, `pdf_pages_to_images`, and `pandoc2txt`.
+When the PDF and Pandoc backends are installed, `ocragent tool --list --scope=parser` includes `pdf2txt`, `pdf_pages_to_images`, and `pandoc2txt`.
 
 ## Generated User Tools
 
-User tools start as prose in `pennyparse.toolbox_user.txt`. Use [../src/pennyparse/pennyparse.toolbox_user.example.txt](../src/pennyparse/pennyparse.toolbox_user.example.txt) as the reference shape. The prose should state concrete facts: tool names, scopes, costs, strengths, limits, required environment variables, flags, command shapes, API calls, and caveats.
+User tools start as prose in `ocragent.toolbox_user.txt`. Use [../src/ocragent/ocragent.toolbox_user.example.txt](../src/ocragent/ocragent.toolbox_user.example.txt) as the reference shape. The prose should state concrete facts: tool names, scopes, costs, strengths, limits, required environment variables, flags, command shapes, API calls, and caveats.
 
 Vendor tool descriptions can be copied from official docs and trimmed. Keep API keys and other secrets in environment variables; the toolbox prose should name those variables, not contain the secret values.
 
-`pennyparse init tools` asks the tool-generation agent to write `${HOME}/.pennyparse/user_toolbox.py`. The generated module must expose:
+`ocragent init tools` asks the tool-generation agent to write `${HOME}/.ocragent/user_toolbox.py`. The generated module must expose:
 
 - `TOOL_SPECS`;
 - `TOOL_HANDLERS`;
@@ -100,4 +100,4 @@ Flags: --path required image file, --lang optional language code.
 Implementation: POST the file bytes to https://api.example.invalid/ocr and return the text field.
 ```
 
-The generated runtime should translate that prose into a manifest plus an `argv` handler. PennyParse does not care whether the handler uses `httpx`, `subprocess`, or a Python library, as long as the contract is honored.
+The generated runtime should translate that prose into a manifest plus an `argv` handler. OCRAgent does not care whether the handler uses `httpx`, `subprocess`, or a Python library, as long as the contract is honored.

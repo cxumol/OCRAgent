@@ -1,6 +1,6 @@
 # Architecture
 
-PennyParse turns a mixed document folder into stable text output. Its design is deliberately small: deterministic code owns files, configuration, tool contracts, and validation; agents make the few choices where a folder or extraction result is too varied for fixed rules.
+OCRAgent turns a mixed document folder into stable text output. Its design is deliberately small: deterministic code owns files, configuration, tool contracts, and validation; agents make the few choices where a folder or extraction result is too varied for fixed rules.
 
 The core design pressure is graded parsing. Tesseract may be enough for plain print and inadequate for decorative type or rare characters. A top multimodal LLM may be excellent for a clean scan and wasteful for a page with an embedded text layer. The architecture exists to route work before spending compute, then review the text before it becomes output.
 
@@ -8,16 +8,16 @@ The system has four layers.
 
 ## Command Boundary
 
-The CLI is the public boundary. `pennyparse init`, `pennyparse tool`, and `pennyparse run` resolve configuration, set up logging, and hand work to command modules. The CLI keeps a strict stream contract: command results go to `stdout`; logs and human messages go to `stderr`; the full runtime log goes to `pennyparse.log`.
+The CLI is the public boundary. `ocragent init`, `ocragent tool`, and `ocragent run` resolve configuration, set up logging, and hand work to command modules. The CLI keeps a strict stream contract: command results go to `stdout`; logs and human messages go to `stderr`; the full runtime log goes to `ocragent.log`.
 
 This boundary matters because tools may return text, JSON, or bytes. Parsers can compose tools only when business output is never mixed with progress output.
 
 ## Local State
 
-PennyParse uses two generated state files.
+OCRAgent uses two generated state files.
 
-- `${HOME}/.pennyparse/user_toolbox.py` is executable tool runtime generated from user-authored toolbox prose.
-- `./.pennyparse_memory.txt` is natural-language folder memory generated during initialization and appended during runs.
+- `${HOME}/.ocragent/user_toolbox.py` is executable tool runtime generated from user-authored toolbox prose.
+- `./.ocragent_memory.txt` is natural-language folder memory generated during initialization and appended during runs.
 
 The first file is code and must satisfy a Python contract. The second file is prose and must remain soft context. Runtime code may read it for hints, but it must not depend on a rigid schema.
 
@@ -50,9 +50,9 @@ The division is intentional. Tool generation is open-ended code synthesis. Folde
 
 A normal run follows this path:
 
-1. `pennyparse init tools` converts user toolbox prose into a validated runtime module.
-2. `pennyparse init docs` scans the working directory, enriches files with cheap previews, groups them by parsing difficulty, and writes folder memory.
-3. `pennyparse run` resolves targets, parses them in batches, reviews each result, writes output files, and appends compact run memory.
+1. `ocragent init tools` converts user toolbox prose into a validated runtime module.
+2. `ocragent init docs` scans the working directory, enriches files with cheap previews, groups them by parsing difficulty, and writes folder memory.
+3. `ocragent run` resolves targets, parses them in batches, reviews each result, writes output files, and appends compact run memory.
 
 PDF handling shows the architecture in miniature. The parser first tries cheap text extraction. If review fails and PDF image fallback is available, it renders pages to images, parses those page images, merges the page text, and reviews the merged result. The fallback is bounded to one layer so the system can recover from scanned PDFs without turning a parse run into open-ended planning.
 
@@ -60,7 +60,7 @@ PDF handling shows the architecture in miniature. The parser first tries cheap t
 
 Configuration is layered from package defaults, user TOML, project TOML, `.env`, and environment variables. Environment variables win. Chat settings follow the OpenAI-compatible chat-completions shape: base URL, API key, and model.
 
-The default chat base is local. PennyParse therefore runs well in a lightweight Linux environment, but LLM-backed initialization requires an explicitly configured model.
+The default chat base is local. OCRAgent therefore runs well in a lightweight Linux environment, but LLM-backed initialization requires an explicitly configured model.
 
 ## Design Pressure
 

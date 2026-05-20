@@ -1,6 +1,6 @@
 # Agent Loop
 
-PennyParse uses agents where the input space is too open for durable rules and where a deterministic validator can still close the loop. The agent may propose; code decides whether the proposal becomes state.
+OCRAgent uses agents where the input space is too open for durable rules and where a deterministic validator can still close the loop. The agent may propose; code decides whether the proposal becomes state.
 
 The loop exists because document parsing needs more than a first pass. A cheap extractor may be enough. A page image may need OCR. A handwritten note, a formula sheet, and a table scan may each call for a different model. After extraction, even a text-only reviewer can catch prose that no longer reads, headings that repeat, tables that drift, and paragraphs that disappear.
 
@@ -10,7 +10,7 @@ The system has four model-facing responsibilities.
 
 `init_tools` turns user-authored toolbox prose into a Python runtime module. This is agent work because the source may describe local commands, HTTP APIs, credentials, and quirks in many styles. A rules engine would either reject useful prose or grow into a weak code generator.
 
-`init docs` groups a local folder and writes `.pennyparse_memory.txt`. This is model work because filenames, preview metadata, and parsing difficulty are weak signals. The output is prose so later code can treat it as guidance.
+`init docs` groups a local folder and writes `.ocragent_memory.txt`. This is model work because filenames, preview metadata, and parsing difficulty are weak signals. The output is prose so later code can treat it as guidance.
 
 `parser` is an agent-shaped controller around deterministic tool execution. Today the first-order candidate ranking is deterministic: availability, scope, flags, extension fit, and cost baseline decide the order. The agent boundary is still useful because real documents are uneven and later policy can use the same tool-call contract without changing filesystem ownership.
 
@@ -20,7 +20,7 @@ The system has four model-facing responsibilities.
 
 Fixed code is good at contracts: walking files, loading settings, checking dependencies, ranking obvious tool candidates, routing stdout, importing generated modules, applying regex, and writing output. It is weak at interpreting informal tool descriptions, grouping unfamiliar folders, and judging whether an extraction is plausible.
 
-PennyParse keeps uncertainty at the top and enforcement at the bottom. The model sees enough context to make a judgment. The program owns all effects.
+OCRAgent keeps uncertainty at the top and enforcement at the bottom. The model sees enough context to make a judgment. The program owns all effects.
 
 ## Implementation Modes
 
@@ -51,7 +51,7 @@ State machine:
 1. Build a prompt from the runtime contract, builtin tool metadata, examples, and the user toolbox TXT.
 2. Ask the model for a complete `user_toolbox.py`.
 3. Extract the Python code.
-4. Write it to `${HOME}/.pennyparse/user_toolbox.py`.
+4. Write it to `${HOME}/.ocragent/user_toolbox.py`.
 5. Import it and validate `TOOL_SPECS`, `TOOL_HANDLERS`, missing secrets, disabled tools, and any caller-provided result checks.
 6. If validation fails, feed the concrete failures back as the next user message.
 7. Stop when validation passes or `[aigc.agent].max_iter` is reached.
@@ -84,7 +84,7 @@ The parser's outer loop is deterministic:
 1. Resolve target files.
 2. Discover builtin and user tools.
 3. Filter to available parser tools with `--path`.
-4. Rank by extension fit and cost baseline from `.pennyparse_memory.txt`.
+4. Rank by extension fit and cost baseline from `.ocragent_memory.txt`.
 5. Run candidate tools until review accepts a result.
 6. For PDFs, try one page-image fallback when text extraction fails.
 7. Write the accepted full text.

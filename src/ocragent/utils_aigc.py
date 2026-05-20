@@ -6,7 +6,7 @@ from collections.abc import Callable, Mapping, Sequence
 from typing import Any
 
 from ._client import ChatSession
-from .config import pp_config
+from .config import ocra_config
 from .logger import get_logger
 from .utils import extract_md_codeblock
 
@@ -34,7 +34,7 @@ def _extract_json_candidate(text: str) -> str:
 
 
 def ai_chat_to_json_obj(client: Any, session: ChatSession) -> Any:
-    retry_limit = int(pp_config["aigc"]["agent"]["max_retry"])
+    retry_limit = int(ocra_config["aigc"]["agent"]["max_retry"])
     last_text = ""
     for attempt in range(1, retry_limit + 1):
         message = complete_with_retry(client, session, max_retry=retry_limit)
@@ -60,7 +60,7 @@ def complete_with_retry(
     retry_backoff: float = 0.25,
     **kwargs: Any,
 ) -> dict[str, Any]:
-    retry_limit = max(1, int(max_retry or pp_config["aigc"]["agent"]["max_retry"]))
+    retry_limit = max(1, int(max_retry or ocra_config["aigc"]["agent"]["max_retry"]))
     last_exc: Exception | None = None
     for attempt in range(1, retry_limit + 1):
         try:
@@ -86,8 +86,8 @@ def run_tool_calls_loop(
     max_retry: int | None = None,
     **completion_options: Any,
 ) -> dict[str, Any]:
-    iter_limit = max(1, int(max_iter or pp_config["aigc"]["agent"]["max_iter"]))
-    retry_limit = max(1, int(max_retry or pp_config["aigc"]["agent"]["max_retry"]))
+    iter_limit = max(1, int(max_iter or ocra_config["aigc"]["agent"]["max_iter"]))
+    retry_limit = max(1, int(max_retry or ocra_config["aigc"]["agent"]["max_retry"]))
 
     for _ in range(iter_limit):
         assistant = complete_with_retry(

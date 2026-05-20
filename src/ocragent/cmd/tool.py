@@ -15,7 +15,7 @@ from ..config import get_user_toolbox_path
 from ..logger import get_logger
 
 USER_TOOLBOX_RUNTIME_CONTRACT = """
-Generate a single Python file at ${HOME}/.pennyparse/user_toolbox.py.
+Generate a single Python file at ${HOME}/.ocragent/user_toolbox.py.
 
 The file exposes three runtime objects:
 
@@ -64,7 +64,7 @@ UNAVAILABLE_TOOLS = {}
 
 
 def tool_example_tool(argv: list[str]) -> str:
-    parser = argparse.ArgumentParser(prog="pennyparse tool example_tool", add_help=False)
+    parser = argparse.ArgumentParser(prog="ocragent tool example_tool", add_help=False)
     parser.add_argument("--path", required=True)
     parser.add_argument("--prompt-text", default="OCR this image.")
     args = parser.parse_args(argv)
@@ -233,7 +233,7 @@ class ToolSpec:
         )
 
     def usage(self) -> str:
-        parts = [f"pennyparse tool {self.name}"]
+        parts = [f"ocragent tool {self.name}"]
         for flag, value in self.flags.items():
             token = f"--{flag}"
             if value:
@@ -359,7 +359,7 @@ def load_user_toolbox_module(*, module_path: Path | None = None) -> tuple[Module
     if not path.exists():
         return None, f"{path} not found"
 
-    spec = importlib.util.spec_from_file_location("pennyparse_user_toolbox", path)
+    spec = importlib.util.spec_from_file_location("ocragent_user_toolbox", path)
     if spec is None or spec.loader is None:
         return None, f"failed to load module spec from {path}"
 
@@ -672,7 +672,7 @@ def _read_image_size(path: Path) -> tuple[int, int]:
 
 
 def img_metadata_px(argv: list[str]) -> dict[str, int]:
-    parser = argparse.ArgumentParser(prog="pennyparse tool img_metadata_px", add_help=False)
+    parser = argparse.ArgumentParser(prog="ocragent tool img_metadata_px", add_help=False)
     parser.add_argument("--path", required=True)
     args = parser.parse_args(argv)
     path = Path(args.path).expanduser().resolve()
@@ -681,7 +681,7 @@ def img_metadata_px(argv: list[str]) -> dict[str, int]:
 
 
 def img_thumb(argv: list[str]) -> bytes:
-    parser = argparse.ArgumentParser(prog="pennyparse tool img_thumb", add_help=False)
+    parser = argparse.ArgumentParser(prog="ocragent tool img_thumb", add_help=False)
     parser.add_argument("--path", required=True)
     args = parser.parse_args(argv)
     path = Path(args.path).expanduser().resolve()
@@ -697,7 +697,7 @@ def img_thumb(argv: list[str]) -> bytes:
 
 
 def pdf_metadata(argv: list[str]) -> dict[str, Any]:
-    parser = argparse.ArgumentParser(prog="pennyparse tool pdf_metadata", add_help=False)
+    parser = argparse.ArgumentParser(prog="ocragent tool pdf_metadata", add_help=False)
     parser.add_argument("--path", required=True)
     args = parser.parse_args(argv)
     path = Path(args.path).expanduser().resolve()
@@ -713,7 +713,7 @@ def pdf_metadata(argv: list[str]) -> dict[str, Any]:
 
 
 def pdf2txt(argv: list[str]) -> str:
-    parser = argparse.ArgumentParser(prog="pennyparse tool pdf2txt", add_help=False)
+    parser = argparse.ArgumentParser(prog="ocragent tool pdf2txt", add_help=False)
     parser.add_argument("--path", required=True)
     args = parser.parse_args(argv)
     path = Path(args.path).expanduser().resolve()
@@ -725,7 +725,7 @@ def pdf2txt(argv: list[str]) -> str:
 
 
 def pdf_pages_to_images(argv: list[str]) -> dict[str, Any]:
-    parser = argparse.ArgumentParser(prog="pennyparse tool pdf_pages_to_images", add_help=False)
+    parser = argparse.ArgumentParser(prog="ocragent tool pdf_pages_to_images", add_help=False)
     parser.add_argument("--path", required=True)
     parser.add_argument("--out-dir", required=True)
     parser.add_argument("--zoom", type=float, default=2.0)
@@ -748,7 +748,7 @@ def pdf_pages_to_images(argv: list[str]) -> dict[str, Any]:
 
 
 def pandoc2txt(argv: list[str]) -> str:
-    parser = argparse.ArgumentParser(prog="pennyparse tool pandoc2txt", add_help=False)
+    parser = argparse.ArgumentParser(prog="ocragent tool pandoc2txt", add_help=False)
     parser.add_argument("--path", required=True)
     args = parser.parse_args(argv)
     path = Path(args.path).expanduser().resolve()

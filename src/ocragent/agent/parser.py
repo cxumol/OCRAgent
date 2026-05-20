@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping
 
-from ..config import get_init_ignore_config, load_pp_config
+from ..config import get_init_ignore_config, load_ocra_config
 from ..logger import get_logger
 from ..cmd import tool as tool_cmd
 from .reviewer import ReviewOutcome, review_text
@@ -60,10 +60,10 @@ def run_parser(
     cwd = cwd or Path.cwd()
     home = home or Path.home()
     logger = logger or get_logger("agent.parser")
-    pp_cfg = load_pp_config(cwd=cwd, home=home)
-    output_dir = _resolve_output_dir(out_dir=out_dir, cwd=cwd, pp_cfg=pp_cfg)
+    ocra_cfg = load_ocra_config(cwd=cwd, home=home)
+    output_dir = _resolve_output_dir(out_dir=out_dir, cwd=cwd, ocra_cfg=ocra_cfg)
     memory = _read_memory(cwd)
-    targets = _resolve_targets(paths=paths, cwd=cwd, memory=memory, output_dir=output_dir, pp_cfg=pp_cfg)
+    targets = _resolve_targets(paths=paths, cwd=cwd, memory=memory, output_dir=output_dir, ocra_cfg=ocra_cfg)
 
     results: list[dict[str, Any]] = []
     failures: list[dict[str, str]] = []
@@ -77,7 +77,7 @@ def run_parser(
                     home=home,
                     out_dir=output_dir,
                     memory=memory,
-                    pp_cfg=pp_cfg,
+                    ocra_cfg=ocra_cfg,
                     logger=logger,
                 ).as_dict()
             )
@@ -107,14 +107,14 @@ def parse_path(
     home: Path | None = None,
     out_dir: Path | None = None,
     memory: str | None = None,
-    pp_cfg: Mapping[str, Any] | None = None,
+    ocra_cfg: Mapping[str, Any] | None = None,
     logger=None,
 ) -> ParseResult:
     cwd = cwd or Path.cwd()
     home = home or Path.home()
     logger = logger or get_logger("agent.parser")
-    pp_cfg = pp_cfg or load_pp_config(cwd=cwd, home=home)
-    output_dir = _resolve_output_dir(out_dir=out_dir, cwd=cwd, pp_cfg=pp_cfg)
+    ocra_cfg = ocra_cfg or load_ocra_config(cwd=cwd, home=home)
+    output_dir = _resolve_output_dir(out_dir=out_dir, cwd=cwd, ocra_cfg=ocra_cfg)
     source = path if path.is_absolute() else (cwd / path)
     source = source.resolve()
     if not source.is_file():
@@ -127,7 +127,7 @@ def parse_path(
         home=home,
         out_dir=output_dir,
         memory=memory,
-        pp_cfg=pp_cfg,
+        ocra_cfg=ocra_cfg,
         logger=logger,
         depth=0,
     )
@@ -136,7 +136,7 @@ def parse_path(
         source=source,
         cwd=cwd,
         out_dir=output_dir,
-        pp_cfg=pp_cfg,
+        ocra_cfg=ocra_cfg,
     )
     return ParseResult(
         ok=True,
@@ -154,7 +154,7 @@ def _parse_source(
     home: Path,
     out_dir: Path,
     memory: str,
-    pp_cfg: Mapping[str, Any],
+    ocra_cfg: Mapping[str, Any],
     logger,
     depth: int,
 ) -> _ParsedText:
@@ -191,7 +191,7 @@ def _parse_source(
                 home=home,
                 out_dir=out_dir,
                 memory=memory,
-                pp_cfg=pp_cfg,
+                ocra_cfg=ocra_cfg,
                 logger=logger,
                 depth=depth,
             )
@@ -246,7 +246,7 @@ def _parse_pdf_pages(
     home: Path,
     out_dir: Path,
     memory: str,
-    pp_cfg: Mapping[str, Any],
+    ocra_cfg: Mapping[str, Any],
     logger,
     depth: int,
 ) -> _ParsedText:
@@ -278,7 +278,7 @@ def _parse_pdf_pages(
             home=home,
             out_dir=out_dir,
             memory=memory,
-            pp_cfg=pp_cfg,
+            ocra_cfg=ocra_cfg,
             logger=logger,
             depth=depth + 1,
         )
@@ -300,7 +300,7 @@ def _parse_pdf_pages(
 
 
 def _pdf_page_image_dir(source: Path, *, cwd: Path, out_dir: Path) -> Path:
-    return out_dir / ".pennyparse_pages" / Path(_relpath(source, cwd))
+    return out_dir / ".ocragent_pages" / Path(_relpath(source, cwd))
 
 
 def _merge_page_text(parsed_pages: list[tuple[int, _ParsedText]]) -> str:
@@ -334,9 +334,9 @@ def _result_text(value: Any) -> str:
     return json.dumps(value, ensure_ascii=False, indent=2)
 
 
-def _resolve_output_dir(*, out_dir: Path | None, cwd: Path, pp_cfg: Mapping[str, Any]) -> Path:
+def _resolve_output_dir(*, out_dir: Path | None, cwd: Path, ocra_cfg: Mapping[str, Any]) -> Path:
     if out_dir is None:
-        configured = _as_mapping(pp_cfg.get("output")).get("dir") or "pennyparse_results"
+        configured = _as_mapping(ocra_cfg.get("output")).get("dir") or "ocragent_results"
         out_dir = Path(str(configured))
     if not out_dir.is_absolute():
         out_dir = cwd / out_dir
@@ -349,25 +349,25 @@ def _write_output(
     source: Path,
     cwd: Path,
     out_dir: Path,
-    pp_cfg: Mapping[str, Any],
+    ocra_cfg: Mapping[str, Any],
 ) -> Path:
     rel = Path(_relpath(source, cwd))
-    ext = _output_ext(pp_cfg)
+    ext = _output_ext(ocra_cfg)
     output_file = out_dir / rel.parent / f"{rel.name}.{ext}"
     output_file.parent.mkdir(parents=True, exist_ok=True)
     output_file.write_text(text, encoding="utf-8")
     return output_file
 
 
-def _output_ext(pp_cfg: Mapping[str, Any]) -> str:
-    configured = str(_as_mapping(pp_cfg.get("output")).get("ext") or "auto").strip().lower()
+def _output_ext(ocra_cfg: Mapping[str, Any]) -> str:
+    configured = str(_as_mapping(ocra_cfg.get("output")).get("ext") or "auto").strip().lower()
     if configured in {"txt", "md", "html"}:
         return configured
     return "txt"
 
 
 def _read_memory(cwd: Path) -> str:
-    path = cwd / ".pennyparse_memory.txt"
+    path = cwd / ".ocragent_memory.txt"
     if not path.exists():
         return ""
     return path.read_text(encoding="utf-8")
@@ -420,9 +420,9 @@ def _resolve_targets(
     cwd: Path,
     memory: str,
     output_dir: Path,
-    pp_cfg: Mapping[str, Any] | None = None,
+    ocra_cfg: Mapping[str, Any] | None = None,
 ) -> list[Path]:
-    ignore_ext, ignore_folder = get_init_ignore_config(pp_cfg or load_pp_config(cwd=cwd))
+    ignore_ext, ignore_folder = get_init_ignore_config(ocra_cfg or load_ocra_config(cwd=cwd))
     if paths:
         found: list[Path] = []
         for item in paths:

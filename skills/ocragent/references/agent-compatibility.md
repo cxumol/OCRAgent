@@ -4,7 +4,7 @@
 
 This skill intentionally uses the smallest common contract:
 
-- folder name: `pennyparse`
+- folder name: `ocragent`
 - required file: `SKILL.md`
 - required frontmatter: `name` and `description`
 - optional lazy files: `references/*.md`
@@ -17,17 +17,17 @@ Callers that implement the SKILL.md / agentskills.io shape should be able to loa
 Use one of these locations depending on the caller:
 
 ```text
-Claude Code project:     .claude/skills/pennyparse/SKILL.md
-Claude Code user:        ~/.claude/skills/pennyparse/SKILL.md
-OpenClaw workspace:      <workspace>/skills/pennyparse/SKILL.md
-OpenClaw global:         ~/.openclaw/skills/pennyparse/SKILL.md
+Claude Code project:     .claude/skills/ocragent/SKILL.md
+Claude Code user:        ~/.claude/skills/ocragent/SKILL.md
+OpenClaw workspace:      <workspace>/skills/ocragent/SKILL.md
+OpenClaw global:         ~/.openclaw/skills/ocragent/SKILL.md
 OpenClaw extra dirs:     skills.load.extraDirs in ~/.openclaw/openclaw.json
-Hermes Agent local:      ~/.hermes/skills/pennyparse/SKILL.md
-Codex user:              ~/.codex/skills/pennyparse/SKILL.md
-Repository copy:         skills/pennyparse/SKILL.md
+Hermes Agent local:      ~/.hermes/skills/ocragent/SKILL.md
+Codex user:              ~/.codex/skills/ocragent/SKILL.md
+Repository copy:         skills/ocragent/SKILL.md
 ```
 
-Copy the whole `pennyparse/` folder when the caller supports multi-file skills. If the caller imports only a single `SKILL.md` from a URL, inline any needed reference content into `SKILL.md` before publishing that single file.
+Copy the whole `ocragent/` folder when the caller supports multi-file skills. If the caller imports only a single `SKILL.md` from a URL, inline any needed reference content into `SKILL.md` before publishing that single file.
 
 ## Caller Notes
 

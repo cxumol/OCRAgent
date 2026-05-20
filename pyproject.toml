@@ -1,5 +1,5 @@
 [project]
-name = "pennyparse"
+name = "ocragent"
 version = "0.1.1"
 description = "Add your description here"
 readme = "README.md"
@@ -22,7 +22,7 @@ dependencies = [
 ]
 
 [project.scripts]
-pennyparse = "pennyparse:main"
+ocragent = "ocragent:main"
 
 [project.optional-dependencies]
 pdf = [
@@ -32,7 +32,7 @@ docx = [
     "pypandoc-binary>=1.17",
 ]
 full = [
-    "pennyparse[pdf,docx]",
+    "ocragent[pdf,docx]",
 ]
 
 [build-system]

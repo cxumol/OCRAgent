@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any, Mapping, Literal
 
 from .._client import ChatClient, ChatSession
-from ..config import load_pp_config
+from ..config import load_ocra_config
 from ..logger import get_logger
 from ..utils import extract_md_codeblock
 
@@ -89,8 +89,8 @@ def review_text(
     logger=None,
 ) -> ReviewOutcome:
     logger = logger or get_logger("agent.reviewer")
-    pp_cfg = load_pp_config(cwd=cwd, home=home)
-    max_length = _review_max_length(pp_cfg)
+    ocra_cfg = load_ocra_config(cwd=cwd, home=home)
+    max_length = _review_max_length(ocra_cfg)
     candidate = text[:max_length]
 
     if not candidate.strip():
@@ -100,7 +100,7 @@ def review_text(
             message="The reviewer found current given result need a major revision.",
         )
 
-    chat_settings = _chat_settings(pp_cfg)
+    chat_settings = _chat_settings(ocra_cfg)
     if not chat_settings.get("model"):
         return ReviewOutcome(
             status="pass",
@@ -114,7 +114,7 @@ def review_text(
             original=text,
             source_path=source_path,
             chat_settings=chat_settings,
-            max_iter=_review_max_iter(pp_cfg),
+            max_iter=_review_max_iter(ocra_cfg),
         )
     except Exception as exc:
         logger.info("LLM review skipped: %s", exc)
@@ -125,22 +125,22 @@ def review_text(
         )
 
 
-def _review_max_length(pp_cfg: Mapping[str, Any]) -> int:
-    output = _as_mapping(pp_cfg.get("output"))
-    reviewer = _as_mapping(pp_cfg.get("reviewer"))
+def _review_max_length(ocra_cfg: Mapping[str, Any]) -> int:
+    output = _as_mapping(ocra_cfg.get("output"))
+    reviewer = _as_mapping(ocra_cfg.get("reviewer"))
     value = output.get("max_length", reviewer.get("max_length"))
     if value is None:
         raise RuntimeError("reviewer.max_length must be configured")
     return max(1, int(value))
 
 
-def _review_max_iter(pp_cfg: Mapping[str, Any]) -> int:
-    agent = _as_mapping(_as_mapping(pp_cfg.get("aigc")).get("agent"))
+def _review_max_iter(ocra_cfg: Mapping[str, Any]) -> int:
+    agent = _as_mapping(_as_mapping(ocra_cfg.get("aigc")).get("agent"))
     return max(1, int(agent.get("max_iter") or 5))
 
 
-def _chat_settings(pp_cfg: Mapping[str, Any]) -> dict[str, Any]:
-    chat = _as_mapping(_as_mapping(_as_mapping(pp_cfg.get("aigc")).get("api")).get("chatcomp"))
+def _chat_settings(ocra_cfg: Mapping[str, Any]) -> dict[str, Any]:
+    chat = _as_mapping(_as_mapping(_as_mapping(ocra_cfg.get("aigc")).get("api")).get("chatcomp"))
     return {
         "base_url": str(chat.get("base") or "").strip(),
         "api_key": str(chat.get("authkey") or "").strip() or None,

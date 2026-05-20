@@ -16,11 +16,10 @@ import httpx
 
 from .._client import ChatClient, ChatSession
 from ..config import (
-    get_chat_settings,
     get_prompt_text,
     get_user_toolbox_example_text,
     inject_prompt_context,
-    pp_config,
+    load_ocra_config,
 )
 from ..logger import get_logger
 from ..utils import extract_md_codeblock, extract_pseudo_xml
@@ -79,7 +78,8 @@ def run_init_tools_agent(
             "__sample_dynamic_import__": SAMPLE_DYNAMIC_IMPORT.strip(),
         },
     )
-    turn_limit = int(pp_config["aigc"]["agent"]["max_iter"])
+    ocra_cfg = load_ocra_config(cwd=cwd)
+    turn_limit = int(_as_mapping(_as_mapping(ocra_cfg.get("aigc")).get("agent")).get("max_iter") or 5)
 
     session = ChatSession()
     session.system(static_prompt)
@@ -91,7 +91,7 @@ def run_init_tools_agent(
         )
     )
 
-    chat_settings = get_chat_settings()
+    chat_settings = _chat_settings(ocra_cfg)
     if not chat_settings.get("model"):
         raise RuntimeError("chat model is not configured")
 
@@ -169,6 +169,19 @@ def _fallback_specs(source_text: str) -> list[dict[str, Any]]:
         }
         for name in names
     ]
+
+
+def _as_mapping(value: Any) -> Mapping[str, Any]:
+    return value if isinstance(value, Mapping) else {}
+
+
+def _chat_settings(ocra_cfg: Mapping[str, Any]) -> dict[str, Any]:
+    chat = _as_mapping(_as_mapping(_as_mapping(ocra_cfg.get("aigc")).get("api")).get("chatcomp"))
+    return {
+        "base_url": str(chat.get("base") or "").strip(),
+        "api_key": str(chat.get("authkey") or "").strip() or None,
+        "model": str(chat.get("model") or "").strip() or None,
+    }
 
 
 def _fallback_tool_names(source_text: str) -> list[str]:
@@ -466,7 +479,7 @@ def _validate_results_with_demo_assets(target_path: Path, specs: list[ToolSpec])
         ]
 
     records: list[ValidationRecord] = []
-    with tempfile.TemporaryDirectory(prefix="pennyparse-init-tools-") as raw_workdir:
+    with tempfile.TemporaryDirectory(prefix="ocragent-init-tools-") as raw_workdir:
         workdir = Path(raw_workdir)
         asset_dir = workdir / "demo_assets"
         asset_dir.mkdir()
@@ -521,7 +534,7 @@ def _validate_results_with_demo_assets(target_path: Path, specs: list[ToolSpec])
 
 def _package_demo_assets() -> list[Traversable]:
     try:
-        root = resources.files("pennyparse").joinpath("demo_assets")
+        root = resources.files("ocragent").joinpath("demo_assets")
         if not root.is_dir():
             return []
         return sorted((item for item in root.iterdir() if item.is_file()), key=lambda item: item.name)
@@ -627,6 +640,6 @@ def _build_summary(
         "agent_turns": turn,
         "result_file": str(target_path),
         "unavailable_tools": unavailable,
-        "log_path": str(Path.cwd() / "pennyparse.log"),
+        "log_path": str(Path.cwd() / "ocragent.log"),
         "validation": [record.as_dict() for record in validation["records"]],
     }

@@ -5,7 +5,7 @@ usage() {
   cat <<'EOF'
 Usage: tests/e2e.sh [-d _test_playground]
 
-Runs a manual end-to-end PennyParse check with the chosen directory as both
+Runs a manual end-to-end OCRAgent check with the chosen directory as both
 HOME and CWD. Console output is structured for copy/paste debugging.
 EOF
 }
@@ -33,9 +33,9 @@ if [[ "$PLAYGROUND_DIR" != /* ]]; then
 fi
 
 RUN_ID="$(date +%Y%m%d-%H%M%S)"
-OUT_DIR="pennyparse_results_e2e_${RUN_ID}"
+OUT_DIR="ocragent_results_e2e_${RUN_ID}"
 UV_CACHE_DIR="${UV_CACHE_DIR:-/tmp/uv-cache}"
-PP_CMD=(uv --project "$REPO_DIR" --cache-dir "$UV_CACHE_DIR" run --extra pdf pennyparse)
+OCRAGENT_CMD=(uv --project "$REPO_DIR" --cache-dir "$UV_CACHE_DIR" run --extra pdf ocragent)
 
 section() {
   printf '\n========== %s ==========\n' "$1"
@@ -59,10 +59,10 @@ show_sanitized_config() {
     printf -- '--- %s (first %s lines, sanitized) ---\n' "$path" "$lines"
     sed -n "1,${lines}p" "$path" |
       sed -E \
-        -e 's/^([[:space:]]*(PENNYPARSE_CHAT_AUTHKEY|OPENAI_API_KEY|.*API_KEY|.*TOKEN|.*SECRET)[[:space:]]*=[[:space:]]*).*/\1***MASKED***/I' \
+        -e 's/^([[:space:]]*(OCRAGENT_CHAT_AUTHKEY|OPENAI_API_KEY|.*API_KEY|.*TOKEN|.*SECRET)[[:space:]]*=[[:space:]]*).*/\1***MASKED***/I' \
         -e 's/^([[:space:]]*authkey[[:space:]]*=[[:space:]]*).*/\1"***MASKED***"/I' \
-        -e 's/^([[:space:]]*(PENNYPARSE_CHAT_MODEL|model)[[:space:]]*=[[:space:]]*).*/\1"***SET***"/I' \
-        -e 's/^([[:space:]]*(PENNYPARSE_CHAT_BASE|base)[[:space:]]*=[[:space:]]*"?)([^"[:space:]]{0,32}).*/\1\3.../I'
+        -e 's/^([[:space:]]*(OCRAGENT_CHAT_MODEL|model)[[:space:]]*=[[:space:]]*).*/\1"***SET***"/I' \
+        -e 's/^([[:space:]]*(OCRAGENT_CHAT_BASE|base)[[:space:]]*=[[:space:]]*"?)([^"[:space:]]{0,32}).*/\1\3.../I'
   else
     printf -- '--- %s missing ---\n' "$path"
   fi
@@ -128,17 +128,17 @@ printf 'uv='
 uv --version 2>&1 || true
 
 section "Prepare Playground"
-mkdir -p "$PLAYGROUND_DIR/docs" "$PLAYGROUND_DIR/.pennyparse"
+mkdir -p "$PLAYGROUND_DIR/docs" "$PLAYGROUND_DIR/.ocragent"
 copy_if_exists "$REPO_DIR/.env" "$PLAYGROUND_DIR/.env"
-copy_if_exists "$REPO_DIR/pennyparse.settings.toml" "$PLAYGROUND_DIR/pennyparse.settings.toml"
-copy_if_exists "$REPO_DIR/.pennyparse/pennyparse.settings.toml" "$PLAYGROUND_DIR/.pennyparse/pennyparse.settings.toml"
-copy_if_exists "$REPO_DIR/pennyparse.toolbox_user.txt" "$PLAYGROUND_DIR/pennyparse.toolbox_user.txt"
+copy_if_exists "$REPO_DIR/ocragent.settings.toml" "$PLAYGROUND_DIR/ocragent.settings.toml"
+copy_if_exists "$REPO_DIR/.ocragent/ocragent.settings.toml" "$PLAYGROUND_DIR/.ocragent/ocragent.settings.toml"
+copy_if_exists "$REPO_DIR/ocragent.toolbox_user.txt" "$PLAYGROUND_DIR/ocragent.toolbox_user.txt"
 copy_demo_assets
 
 section "Sanitized Config Presence"
 show_sanitized_config "$PLAYGROUND_DIR/.env" 80
-show_sanitized_config "$PLAYGROUND_DIR/pennyparse.settings.toml" 80
-show_sanitized_config "$PLAYGROUND_DIR/.pennyparse/pennyparse.settings.toml" 80
+show_sanitized_config "$PLAYGROUND_DIR/ocragent.settings.toml" 80
+show_sanitized_config "$PLAYGROUND_DIR/.ocragent/ocragent.settings.toml" 80
 
 cd "$PLAYGROUND_DIR" || exit 1
 export HOME="$PLAYGROUND_DIR"
@@ -146,17 +146,17 @@ export HOME="$PLAYGROUND_DIR"
 INIT_STATUS=0
 RUN_STATUS=0
 
-run_step "pennyparse tool --list before init" "${PP_CMD[@]}" tool --list || true
-run_step "pennyparse init" "${PP_CMD[@]}" init --force --from pennyparse.toolbox_user.txt
+run_step "ocragent tool --list before init" "${OCRAGENT_CMD[@]}" tool --list || true
+run_step "ocragent init" "${OCRAGENT_CMD[@]}" init --force --from ocragent.toolbox_user.txt
 INIT_STATUS=$?
 
-run_step "pennyparse tool --list after init" "${PP_CMD[@]}" tool --list || true
+run_step "ocragent tool --list after init" "${OCRAGENT_CMD[@]}" tool --list || true
 
 if [[ "$INIT_STATUS" -eq 0 ]]; then
-  run_step "pennyparse run" "${PP_CMD[@]}" run docs --out-dir "$OUT_DIR"
+  run_step "ocragent run" "${OCRAGENT_CMD[@]}" run docs --out-dir "$OUT_DIR"
   RUN_STATUS=$?
 else
-  section "pennyparse run skipped"
+  section "ocragent run skipped"
   printf 'init failed, so run was skipped\n'
   RUN_STATUS=1
 fi
@@ -164,14 +164,14 @@ fi
 section "Generated Files"
 find . -maxdepth 5 -type f \
   ! -path './.env' \
-  ! -path './.pennyparse/__pycache__/*' \
+  ! -path './.ocragent/__pycache__/*' \
   -printf '%p\t%k KiB\n' | sort
 
 section "Memory"
-show_file ".pennyparse_memory.txt" 160
+show_file ".ocragent_memory.txt" 160
 
 section "Generated User Toolbox"
-show_file ".pennyparse/user_toolbox.py" 220
+show_file ".ocragent/user_toolbox.py" 220
 
 section "Result Previews"
 if [[ -d "$OUT_DIR" ]]; then
@@ -182,11 +182,11 @@ else
   printf '%s missing\n' "$OUT_DIR"
 fi
 
-section "PennyParse Log Tail"
-if [[ -f pennyparse.log ]]; then
-  tail -n 220 pennyparse.log
+section "OCRAgent Log Tail"
+if [[ -f ocragent.log ]]; then
+  tail -n 220 ocragent.log
 else
-  printf 'pennyparse.log missing\n'
+  printf 'ocragent.log missing\n'
 fi
 
 section "Summary"

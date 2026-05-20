@@ -4,14 +4,14 @@ import logging
 import sys
 from pathlib import Path
 
-_LOGGER_NAME = "pennyparse"
+_LOGGER_NAME = "ocragent"
 _CONFIGURED_LOG_PATH: Path | None = None
 
 
 def configure_logging(*, cwd: Path | None = None, level: int = logging.INFO) -> Path:
     global _CONFIGURED_LOG_PATH
 
-    log_path = (cwd or Path.cwd()) / "pennyparse.log"
+    log_path = (cwd or Path.cwd()) / "ocragent.log"
     logger = logging.getLogger(_LOGGER_NAME)
     if _CONFIGURED_LOG_PATH == log_path and logger.handlers:
         return log_path
