@@ -91,33 +91,41 @@ export OCRAGENT_CHAT_AUTHKEY=your-key
 
 ## Quick Start
 
-List available tools:
+Run the guided default flow inside a document folder:
+
+```shell
+cd /path/to/documents
+ocragent --dry-run
+ocragent
+```
+
+`ocragent --dry-run` prints the stages OCRAgent will run. `ocragent` then starts from the latest safe stage: it reuses existing generated files, creates missing safe runtime files when possible, initializes folder memory when needed, and parses documents into `ocragent_results`.
+
+Parse selected files or folders:
+
+```shell
+ocragent invoice.pdf scans/ --out-dir ocragent_results
+```
+
+List available tools when you want to inspect the runtime:
 
 ```shell
 ocragent tool --list
 ocragent tool --list --scope=parser
 ```
 
-Generate user tools if you want OCRAgent to call your own OCR, VLM, shell command, or API. Describe tools in plain text:
+If you want OCRAgent to call your own OCR, VLM, shell command, or API, describe those tools in plain text:
 
 ```text
 $HOME/ocragent.toolbox_user.txt
 ```
 
-The format can follow [src/ocragent/ocragent.toolbox_user.example.txt](src/ocragent/ocragent.toolbox_user.example.txt). Include tool name, scope, cost, flags, limits, call shape, and required environment variables.
+The format can follow [src/ocragent/ocragent.toolbox_user.example.txt](src/ocragent/ocragent.toolbox_user.example.txt). Include tool name, scope, cost, flags, limits, call shape, and required environment variables. On the next `ocragent` run, OCRAgent can generate `$HOME/.ocragent/user_toolbox.py`; review that file before running generated tools with credentials.
 
-Generate the runtime:
+For manual control or troubleshooting, run the same stages explicitly:
 
 ```shell
 ocragent init tools
-```
-
-OCRAgent writes executable Python to `$HOME/.ocragent/user_toolbox.py`. Review this file before running it with credentials.
-
-Initialize and parse a document folder:
-
-```shell
-cd /path/to/documents
 ocragent init docs
 ocragent run --out-dir ocragent_results
 ```
@@ -137,17 +145,12 @@ pandoc2txt	scope: parser cost: low	Convert office documents to plain text with P
 	--path /path/to/file
 
 $ cd ~/cases/mixed_docs
-$ ocragent init tools --from ./ocragent.toolbox_user.txt
-# writes /home/me/.ocragent/user_toolbox.py
-# reports valid and failed user tools
+$ ocragent --dry-run
+# prints prepare, init tools, init docs, and run decisions
 
-$ ocragent init docs
-# writes .ocragent_memory.txt
-# reports detected groups, file_count, and unmatched_count
-
-$ ocragent run invoice.pdf scans/ --out-dir ocragent_results
+$ ocragent invoice.pdf scans/ --out-dir ocragent_results
 # writes parsed files under ocragent_results/
-# reports parsed_count, failed_count, skipped_count, and output_stats
+# reports stages_run, parsed_count, failed_count, skipped_count, and failures
 ```
 
 The commands return JSON in normal use. The example above keeps the flow compact and notes the important fields.

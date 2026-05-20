@@ -15,7 +15,7 @@ The system has four layers.
 
 ## Command Boundary
 
-The CLI is the public boundary. `ocragent init`, `ocragent tool`, and `ocragent run` resolve configuration, set up logging, and hand work to command modules. The CLI keeps a strict stream contract: command results go to `stdout`; logs and human messages go to `stderr`; the full runtime log goes to `ocragent.log`.
+The CLI is the public boundary. Bare `ocragent` runs Autonomous Mode, which chooses the latest safe stage and then hands work to command modules. `ocragent init`, `ocragent tool`, and `ocragent run` remain explicit lower-level controls. The CLI keeps a strict stream contract: command results go to `stdout`; logs and human messages go to `stderr`; the full runtime log goes to `ocragent.log`.
 
 This boundary matters because tools may return text, JSON, or bytes. Parsers can compose tools only when business output is never mixed with progress output.
 
@@ -55,7 +55,7 @@ The division is intentional. Tool generation is open-ended code synthesis. Folde
 
 ## Parse Lifecycle
 
-A normal run follows the same four steps:
+A guided run starts with `ocragent`, which plans and runs the needed stages. The explicit stage commands are:
 
 1. `ocragent init tools` converts user toolbox prose into a validated runtime module.
 2. `ocragent init docs` scans the working directory, enriches files with cheap previews, grades parsing difficulty, and writes folder memory.

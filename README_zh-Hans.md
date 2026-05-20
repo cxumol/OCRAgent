@@ -91,33 +91,41 @@ export OCRAGENT_CHAT_AUTHKEY=your-key
 
 ## 快速开始
 
-查看可用工具：
+在文档目录里运行默认引导流程：
+
+```shell
+cd /path/to/documents
+ocragent --dry-run
+ocragent
+```
+
+`ocragent --dry-run` 会打印将要执行的阶段。`ocragent` 会从当前安全阶段开始：复用已有生成文件，必要时创建安全的运行时文件，按需初始化目录记忆，然后把解析结果写入 `ocragent_results`。
+
+解析指定文件或目录：
+
+```shell
+ocragent invoice.pdf scans/ --out-dir ocragent_results
+```
+
+需要检查运行时工具时，可查看工具列表：
 
 ```shell
 ocragent tool --list
 ocragent tool --list --scope=parser
 ```
 
-如果要让 OCRAgent 调用自己的 OCR、VLM、命令行工具或 API，先用普通文本描述工具：
+如果要让 OCRAgent 调用自己的 OCR、VLM、命令行工具或 API，用普通文本描述这些工具：
 
 ```text
 $HOME/ocragent.toolbox_user.txt
 ```
 
-格式可参考 [src/ocragent/ocragent.toolbox_user.example.txt](src/ocragent/ocragent.toolbox_user.example.txt)。说明中写清工具名、scope、成本、参数、限制、调用方式和所需环境变量。
+格式可参考 [src/ocragent/ocragent.toolbox_user.example.txt](src/ocragent/ocragent.toolbox_user.example.txt)。说明中写清工具名、scope、成本、参数、限制、调用方式和所需环境变量。下次运行 `ocragent` 时，OCRAgent 可生成 `$HOME/.ocragent/user_toolbox.py`；使用真实凭据运行生成工具前，应先审阅该文件。
 
-生成工具运行时：
+需要手动控制流程或排查问题时，可显式运行同一组阶段：
 
 ```shell
 ocragent init tools
-```
-
-OCRAgent 会把可执行 Python 写入 `$HOME/.ocragent/user_toolbox.py`。使用真实凭据前，应先审阅该文件。
-
-初始化并解析文档目录：
-
-```shell
-cd /path/to/documents
 ocragent init docs
 ocragent run --out-dir ocragent_results
 ```
@@ -137,17 +145,12 @@ pandoc2txt	scope: parser cost: low	Convert office documents to plain text with P
 	--path /path/to/file
 
 $ cd ~/cases/mixed_docs
-$ ocragent init tools --from ./ocragent.toolbox_user.txt
-# 写入 /home/me/.ocragent/user_toolbox.py
-# 返回可用和失败的用户工具
+$ ocragent --dry-run
+# 打印 prepare、init tools、init docs、run 的决策
 
-$ ocragent init docs
-# 写入 .ocragent_memory.txt
-# 返回识别出的分组、file_count 和 unmatched_count
-
-$ ocragent run invoice.pdf scans/ --out-dir ocragent_results
+$ ocragent invoice.pdf scans/ --out-dir ocragent_results
 # 将解析结果写入 ocragent_results/
-# 返回 parsed_count、failed_count、skipped_count 和 output_stats
+# 返回 stages_run、parsed_count、failed_count、skipped_count 和 failures
 ```
 
 实际运行时命令会返回 JSON。上面的示例保留流程和关键字段，避免展开过长结果。

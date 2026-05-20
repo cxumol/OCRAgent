@@ -52,67 +52,25 @@ export OCRAGENT_CHAT_AUTHKEY=your-key
 
 `full` 会带上常用本地文档后端。若只想装最小依赖，也可以另行选择；多数用户从 `ocragent[full]` 开始最省心。
 
-## 准备用户工具
+## 运行引导流程
 
-把外部工具写在 `${HOME}/ocragent.toolbox_user.txt`，也可以用 `--from` 指定别的文件。写法可参考 [../src/ocragent/ocragent.toolbox_user.example.txt](../src/ocragent/ocragent.toolbox_user.example.txt)。
-
-内容用平实的技术说明即可：工具名、用途范围、成本、参数、能力边界、调用方式和注意事项。工具说明可以从对应官方文档摘取，再删到 OCRAgent 需要的事实。API key 等机要内容放进环境变量，在工具箱说明中写环境变量名即可。
-
-生成工具运行时：
-
-```shell
-ocragent init tools
-ocragent init tools --from ./ocragent.toolbox_user.txt --force
-```
-
-生成结果位于 `${HOME}/.ocragent/user_toolbox.py`。它是可执行 Python 代码，带真实凭据使用前，须先看一遍。
-
-## 初始化文档目录
-
-`ocragent init docs` 需要 `${HOME}/.ocragent/user_toolbox.py` 已存在，所以先准备用户工具，再进入文档所在目录：
+进入文档所在目录运行 `ocragent`：
 
 ```shell
 cd /path/to/documents
-ocragent init docs
-```
-
-命令会写入 `./.ocragent_memory.txt`。这个文件是一份自然语言记忆，记下文件分组、解析难度和低成本预览结果。它只是给后续解析看的札记，不要求手工维护结构。
-
-`ocragent.settings.toml` 中 `[init.ignore]` 列出的文件后缀和目录，会同时被 `init docs` 扫描和 `run` 目录遍历排除。
-
-完整初始化会同时生成工具和目录记忆：
-
-```shell
-ocragent init --from /path/to/ocragent.toolbox_user.txt --force
-```
-
-JSON 输出中，生成文件路径使用 `result_file` 字段。`init docs` 的 `groups` 是分组记录列表，另有 `file_count` 和 `unmatched_count`。
-
-## 解析文档
-
-默认引导流程是在文档目录运行 `ocragent`：
-
-```shell
-ocragent
-ocragent invoice.pdf scans/ --out-dir ocragent_results
 ocragent --dry-run
+ocragent
 ```
 
-Autonomous Mode 会复用已有生成文件，能安全补齐时自动补齐，然后进入解析。若 `${HOME}/.ocragent/user_toolbox.py` 缺失且 `${HOME}/ocragent.toolbox_user.txt` 存在，它会先运行 `init tools`。若 `.ocragent_memory.txt` 缺失，它会先运行 `init docs`。没有 toolbox TXT 时，它会创建仅含内建工具的运行时，并在其余状态足够时继续。`--yes` 用于接受非破坏性确认，`--force` 用于重新生成初始化文件。
-
-解析当前目录：
-
-```shell
-ocragent run
-```
+`ocragent --dry-run` 会打印计划执行的阶段，不修改文件。`ocragent` 会从当前安全阶段开始，能安全补齐时创建缺失的运行时文件，按需初始化目录记忆，然后解析文档。
 
 解析指定文件或目录：
 
 ```shell
-ocragent run invoice.pdf scans/ --out-dir ocragent_results
+ocragent invoice.pdf scans/ --out-dir ocragent_results
 ```
 
-`ocragent run` 需要 `${HOME}/.ocragent/user_toolbox.py` 和 `./.ocragent_memory.txt` 都已存在。返回摘要使用 `parsed_count`、`failed_count`、`skipped_count`，并包含详细的 `results`、`failures`、`skipped` 和 `output_stats`。
+Autonomous Mode 会复用已有生成文件。若 `${HOME}/.ocragent/user_toolbox.py` 缺失且 `${HOME}/ocragent.toolbox_user.txt` 存在，它会先运行 `init tools`。若 `.ocragent_memory.txt` 缺失，它会先运行 `init docs`。没有 toolbox TXT 时，它会创建仅含内建工具的运行时，并在其余状态足够时继续。`--yes` 用于接受非破坏性确认，`--force` 用于重新生成初始化文件。
 
 每个成功解析的源文件会在输出目录下生成一个 UTF-8 文本文件，并保留相对路径：
 
@@ -121,6 +79,51 @@ docs/report.pdf -> ocragent_results/docs/report.pdf.txt
 ```
 
 运行过程中，OCRAgent 会向 `.ocragent_memory.txt` 追加批次摘要和最终输出摘要。以后再跑，它便能少走一点弯路。
+
+## 使用外部工具
+
+把外部工具写在 `${HOME}/ocragent.toolbox_user.txt`，也可以用 `--from` 指定别的文件。写法可参考 [../src/ocragent/ocragent.toolbox_user.example.txt](../src/ocragent/ocragent.toolbox_user.example.txt)。
+
+内容用平实的技术说明即可：工具名、用途范围、成本、参数、能力边界、调用方式和注意事项。工具说明可以从对应官方文档摘取，再删到 OCRAgent 需要的事实。API key 等机要内容放进环境变量，在工具箱说明中写环境变量名即可。
+
+下次运行 `ocragent` 时，OCRAgent 可生成 `${HOME}/.ocragent/user_toolbox.py`。它是可执行 Python 代码，带真实凭据使用前，须先看一遍。
+
+手动生成或重新生成工具运行时：
+
+```shell
+ocragent init tools
+ocragent init tools --from ./ocragent.toolbox_user.txt --force
+```
+
+## 手动流程
+
+需要直接控制初始化和解析时，可显式运行各阶段：
+
+```shell
+cd /path/to/documents
+ocragent init docs
+ocragent run --out-dir ocragent_results
+```
+
+`ocragent init docs` 会写入 `./.ocragent_memory.txt`。这个文件是一份自然语言记忆，记下文件分组、解析难度和低成本预览结果。它只是给后续解析看的札记，不要求手工维护结构。
+
+`ocragent.settings.toml` 中 `[init.ignore]` 列出的文件后缀和目录，会同时被 `init docs` 扫描和 `run` 目录遍历排除。
+
+完整初始化会同时运行两个 init 阶段：
+
+```shell
+ocragent init --from /path/to/ocragent.toolbox_user.txt --force
+```
+
+JSON 输出中，生成文件路径使用 `result_file` 字段。`init docs` 的 `groups` 是分组记录列表，另有 `file_count` 和 `unmatched_count`。
+
+手动解析也可以指定文件或目录：
+
+```shell
+ocragent run invoice.pdf scans/ --out-dir ocragent_results
+```
+
+`ocragent run` 需要 `${HOME}/.ocragent/user_toolbox.py` 和 `./.ocragent_memory.txt` 都已存在。返回摘要使用 `parsed_count`、`failed_count`、`skipped_count`，并包含详细的 `results`、`failures`、`skipped` 和 `output_stats`。
 
 ## 查看与运行工具
 

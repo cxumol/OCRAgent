@@ -52,67 +52,25 @@ export OCRAGENT_CHAT_AUTHKEY=your-key
 
 The `full` extra includes the common local document backends. Minimal installs are possible, but most users should start with `ocragent[full]`.
 
-## Prepare User Tools
+## Run Guided Flow
 
-Create a toolbox description at `${HOME}/ocragent.toolbox_user.txt`, or pass another file with `--from`. Follow the shape in [../src/ocragent/ocragent.toolbox_user.example.txt](../src/ocragent/ocragent.toolbox_user.example.txt).
-
-Describe each external parser or API in plain technical prose: name, scope, cost, flags, strengths, limits, and how to call it. Vendor tool descriptions can be copied from official docs and trimmed to the facts OCRAgent needs. Keep secrets in environment variables, then name those variables in the toolbox prose.
-
-Generate the runtime:
-
-```shell
-ocragent init tools
-ocragent init tools --from ./ocragent.toolbox_user.txt --force
-```
-
-Review `${HOME}/.ocragent/user_toolbox.py` before running generated tools with credentials.
-
-## Initialize A Document Folder
-
-`ocragent init docs` requires `${HOME}/.ocragent/user_toolbox.py`, so prepare user tools first. Then run this inside the folder that contains the documents:
+Run `ocragent` inside the folder that contains the documents:
 
 ```shell
 cd /path/to/documents
-ocragent init docs
-```
-
-The command writes `./.ocragent_memory.txt`. It is prose used as guidance. It records file groups, rough parsing difficulty, and cheap preview observations so later runs can start with better tool choices.
-
-Files and folders listed under `[init.ignore]` in `ocragent.settings.toml` are excluded when `init docs` scans the folder and when `run` walks directories.
-
-The full initialization command runs both steps:
-
-```shell
-ocragent init --from /path/to/ocragent.toolbox_user.txt --force
-```
-
-Its JSON output uses `result_file` for generated paths. `init docs` returns `groups` as a list of group records, plus `file_count` and `unmatched_count`.
-
-## Parse Documents
-
-For the guided default flow, run `ocragent` in a document folder:
-
-```shell
-ocragent
-ocragent invoice.pdf scans/ --out-dir ocragent_results
 ocragent --dry-run
+ocragent
 ```
 
-Autonomous Mode reuses existing generated assets, creates missing safe assets when it can, then runs parsing. If `${HOME}/.ocragent/user_toolbox.py` is missing and `${HOME}/ocragent.toolbox_user.txt` exists, it runs `init tools` first. If `.ocragent_memory.txt` is missing, it runs `init docs` before parsing. With no toolbox TXT, it creates a builtin-only runtime and continues when the remaining state is sufficient. Use `--yes` to accept non-destructive review prompts and `--force` to regenerate initialization assets.
-
-Parse the current folder:
-
-```shell
-ocragent run
-```
+`ocragent --dry-run` prints the planned stages without modifying files. `ocragent` starts from the latest safe stage, creates missing safe runtime files when possible, initializes folder memory when needed, and then parses documents.
 
 Parse selected files or directories:
 
 ```shell
-ocragent run invoice.pdf scans/ --out-dir ocragent_results
+ocragent invoice.pdf scans/ --out-dir ocragent_results
 ```
 
-`ocragent run` requires both `${HOME}/.ocragent/user_toolbox.py` and `./.ocragent_memory.txt`. Its JSON summary reports `parsed_count`, `failed_count`, `skipped_count`, detailed `results`, `failures`, `skipped`, and `output_stats`.
+Autonomous Mode reuses existing generated assets. If `${HOME}/.ocragent/user_toolbox.py` is missing and `${HOME}/ocragent.toolbox_user.txt` exists, it runs `init tools` first. If `.ocragent_memory.txt` is missing, it runs `init docs` before parsing. With no toolbox TXT, it creates a builtin-only runtime and continues when the remaining state is sufficient. Use `--yes` to accept non-destructive review prompts and `--force` to regenerate initialization assets.
 
 Each successful source writes one UTF-8 text file under the output directory. The source-relative path is preserved:
 
@@ -121,6 +79,51 @@ docs/report.pdf -> ocragent_results/docs/report.pdf.txt
 ```
 
 During a run, OCRAgent appends short batch notes and a final output summary to `.ocragent_memory.txt`. The notes help future runs and do not need hand editing.
+
+## Use External Tools
+
+Create a toolbox description at `${HOME}/ocragent.toolbox_user.txt`, or pass another file with `--from`. Follow the shape in [../src/ocragent/ocragent.toolbox_user.example.txt](../src/ocragent/ocragent.toolbox_user.example.txt).
+
+Describe each external parser or API in plain technical prose: name, scope, cost, flags, strengths, limits, and how to call it. Vendor tool descriptions can be copied from official docs and trimmed to the facts OCRAgent needs. Keep secrets in environment variables, then name those variables in the toolbox prose.
+
+On the next `ocragent` run, OCRAgent can generate `${HOME}/.ocragent/user_toolbox.py`. Review that file before running generated tools with credentials.
+
+Generate or regenerate the runtime manually:
+
+```shell
+ocragent init tools
+ocragent init tools --from ./ocragent.toolbox_user.txt --force
+```
+
+## Manual Workflow
+
+Use the explicit stages when you want direct control over initialization and parsing:
+
+```shell
+cd /path/to/documents
+ocragent init docs
+ocragent run --out-dir ocragent_results
+```
+
+`ocragent init docs` writes `./.ocragent_memory.txt`. It is prose used as guidance. It records file groups, rough parsing difficulty, and cheap preview observations so later runs can start with better tool choices.
+
+Files and folders listed under `[init.ignore]` in `ocragent.settings.toml` are excluded when `init docs` scans the folder and when `run` walks directories.
+
+The full initialization command runs both init stages:
+
+```shell
+ocragent init --from /path/to/ocragent.toolbox_user.txt --force
+```
+
+Its JSON output uses `result_file` for generated paths. `init docs` returns `groups` as a list of group records, plus `file_count` and `unmatched_count`.
+
+Manual parsing also accepts selected files or directories:
+
+```shell
+ocragent run invoice.pdf scans/ --out-dir ocragent_results
+```
+
+`ocragent run` requires both `${HOME}/.ocragent/user_toolbox.py` and `./.ocragent_memory.txt`. Its JSON summary reports `parsed_count`, `failed_count`, `skipped_count`, detailed `results`, `failures`, `skipped`, and `output_stats`.
 
 ## Inspect Tools
 
