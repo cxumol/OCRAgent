@@ -30,6 +30,7 @@ _INIT_ENTRYPOINT = "ocragent.cmd.init:run_init"
 _LIST_TOOLS_ENTRYPOINT = "ocragent.cmd.tool:list_tools"
 _RUN_TOOL_ENTRYPOINT = "ocragent.cmd.tool:run_tool"
 _RUN_ENTRYPOINT = "ocragent.cmd.run:run"
+_AUTO_ENTRYPOINT = "ocragent.cmd.auto:main"
 _TOOL_USAGE_ERROR_ENTRYPOINT = "ocragent.cmd.tool:ToolUsageError"
 _TOOL_UNAVAILABLE_ERROR_ENTRYPOINT = "ocragent.cmd.tool:ToolUnavailableError"
 _WEB_SERVE_ENTRYPOINT = "ocragent.web:serve"
@@ -314,7 +315,18 @@ def serve(
 
 
 def main() -> None:
+    if _should_run_auto(sys.argv[1:]):
+        raise SystemExit(resolve_entrypoint(_AUTO_ENTRYPOINT)(sys.argv[1:]))
     app()
+
+
+def _should_run_auto(argv: list[str]) -> bool:
+    if not argv:
+        return True
+    if argv[0] in {"-h", "--help"}:
+        return False
+    known_commands = {"init", "tool", "run", "serve"}
+    return argv[0] not in known_commands
 
 
 if __name__ == "__main__":

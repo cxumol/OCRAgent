@@ -29,6 +29,7 @@ if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
 from ocragent.cmd import init_docs, tool as tool_cmd  # noqa: E402
+from ocragent.cmd import auto as auto_cmd  # noqa: E402
 from ocragent.cmd import run as run_cmd  # noqa: E402
 from ocragent import cli as cli_module  # noqa: E402
 from ocragent.agent import init_tools as init_tools_agent  # noqa: E402
@@ -652,6 +653,84 @@ class InitCliTests(unittest.TestCase):
         self.assertTrue(calls[0]["overwrite"])
         self.assertEqual(calls[0]["source_path"], source)
         self.assertTrue(json.loads(result.stdout)["ok"])
+
+
+class AutoModeTests(unittest.TestCase):
+    def test_auto_dry_run_reports_needed_stages_without_writing(self) -> None:
+        with tempfile.TemporaryDirectory() as cwd_raw, tempfile.TemporaryDirectory() as home_raw:
+            cwd = Path(cwd_raw)
+            home = Path(home_raw)
+            (home / "ocragent.toolbox_user.txt").write_text("toolbox\n", encoding="utf-8")
+            _write_fake_settings(home)
+
+            summary = auto_cmd.run_auto(cwd=cwd, home=home, dry_run=True)
+
+            self.assertTrue(summary["ok"])
+            self.assertTrue(summary["dry_run"])
+            self.assertIn("init tools: run, toolbox TXT exists", summary["plan"])
+            self.assertIn("init docs: run, .ocragent_memory.txt missing", summary["plan"])
+            self.assertFalse((home / ".ocragent" / "user_toolbox.py").exists())
+            self.assertFalse((cwd / ".ocragent_memory.txt").exists())
+
+    def test_auto_runs_existing_initialized_state(self) -> None:
+        with tempfile.TemporaryDirectory() as cwd_raw, tempfile.TemporaryDirectory() as home_raw:
+            cwd = Path(cwd_raw)
+            home = Path(home_raw)
+            _write_fake_user_toolbox(home)
+            (cwd / ".ocragent_memory.txt").write_text("initial memory\n", encoding="utf-8")
+            source = cwd / "a.txt"
+            source.write_text("alpha\n", encoding="utf-8")
+
+            with mock.patch.dict(os.environ, {key: "" for key in CHAT_ENV_KEYS}):
+                summary = auto_cmd.run_auto(
+                    paths=[source],
+                    out_dir=cwd / "out",
+                    cwd=cwd,
+                    home=home,
+                )
+
+            self.assertTrue(summary["ok"])
+            self.assertEqual(summary["stages_run"], ["run"])
+            self.assertEqual(summary["parsed_count"], 1)
+            self.assertEqual(summary["memory_file"], str(cwd / ".ocragent_memory.txt"))
+            self.assertEqual(summary["toolbox_file"], str(home / ".ocragent" / "user_toolbox.py"))
+
+    def test_auto_creates_builtin_only_runtime_when_memory_exists(self) -> None:
+        with tempfile.TemporaryDirectory() as cwd_raw, tempfile.TemporaryDirectory() as home_raw:
+            cwd = Path(cwd_raw)
+            home = Path(home_raw)
+            (cwd / ".ocragent_memory.txt").write_text("initial memory\n", encoding="utf-8")
+
+            with mock.patch("ocragent.cmd.auto.run") as fake_run:
+                fake_run.return_value = {
+                    "ok": True,
+                    "out_dir": str(cwd / "out"),
+                    "parsed_count": 0,
+                    "failed_count": 0,
+                    "skipped_count": 0,
+                    "failures": [],
+                    "skipped": [],
+                }
+                summary = auto_cmd.run_auto(out_dir=cwd / "out", cwd=cwd, home=home)
+
+            toolbox = home / ".ocragent" / "user_toolbox.py"
+            module, module_error = tool_cmd.load_user_toolbox_module(module_path=toolbox)
+            specs, specs_error = tool_cmd.load_user_specs(module=module)
+
+            self.assertTrue(summary["ok"])
+            self.assertEqual(summary["stages_run"], ["init tools", "run"])
+            self.assertTrue(toolbox.exists())
+            self.assertIsNone(module_error)
+            self.assertIsNone(specs_error)
+            self.assertEqual(specs, [])
+
+    def test_auto_main_dispatch_predicate_keeps_subcommands(self) -> None:
+        self.assertTrue(cli_module._should_run_auto([]))
+        self.assertTrue(cli_module._should_run_auto(["invoice.pdf"]))
+        self.assertTrue(cli_module._should_run_auto(["--dry-run"]))
+        self.assertFalse(cli_module._should_run_auto(["run"]))
+        self.assertFalse(cli_module._should_run_auto(["init"]))
+        self.assertFalse(cli_module._should_run_auto(["--help"]))
 
 
 class ReviewerTests(unittest.TestCase):

@@ -90,6 +90,16 @@ JSON 输出中，生成文件路径使用 `result_file` 字段。`init docs` 的
 
 ## 解析文档
 
+默认引导流程是在文档目录运行 `ocragent`：
+
+```shell
+ocragent
+ocragent invoice.pdf scans/ --out-dir ocragent_results
+ocragent --dry-run
+```
+
+Autonomous Mode 会复用已有生成文件，能安全补齐时自动补齐，然后进入解析。若 `${HOME}/.ocragent/user_toolbox.py` 缺失且 `${HOME}/ocragent.toolbox_user.txt` 存在，它会先运行 `init tools`。若 `.ocragent_memory.txt` 缺失，它会先运行 `init docs`。没有 toolbox TXT 时，它会创建仅含内建工具的运行时，并在其余状态足够时继续。`--yes` 用于接受非破坏性确认，`--force` 用于重新生成初始化文件。
+
 解析当前目录：
 
 ```shell

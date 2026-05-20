@@ -340,8 +340,10 @@ def load_user_specs(
     raw_specs = getattr(owned_module, "TOOL_SPECS", None)
     if raw_specs is None:
         return [], "user toolbox does not expose TOOL_SPECS"
-    if not isinstance(raw_specs, list) or not raw_specs:
-        return [], "user toolbox TOOL_SPECS must be a non-empty list"
+    if not isinstance(raw_specs, list):
+        return [], "user toolbox TOOL_SPECS must be a list"
+    if not raw_specs:
+        return [], None
 
     specs: list[ToolSpec] = []
     for index, item in enumerate(raw_specs):

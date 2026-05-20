@@ -90,6 +90,16 @@ Its JSON output uses `result_file` for generated paths. `init docs` returns `gro
 
 ## Parse Documents
 
+For the guided default flow, run `ocragent` in a document folder:
+
+```shell
+ocragent
+ocragent invoice.pdf scans/ --out-dir ocragent_results
+ocragent --dry-run
+```
+
+Autonomous Mode reuses existing generated assets, creates missing safe assets when it can, then runs parsing. If `${HOME}/.ocragent/user_toolbox.py` is missing and `${HOME}/ocragent.toolbox_user.txt` exists, it runs `init tools` first. If `.ocragent_memory.txt` is missing, it runs `init docs` before parsing. With no toolbox TXT, it creates a builtin-only runtime and continues when the remaining state is sufficient. Use `--yes` to accept non-destructive review prompts and `--force` to regenerate initialization assets.
+
 Parse the current folder:
 
 ```shell
