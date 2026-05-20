@@ -2,6 +2,8 @@
 
 # OCRAgent
 
+[English](README.md) | [简体中文](README_zh-Hans.md)
+
 [![Publish to PyPI](https://github.com/cxumol/OCRAgent/actions/workflows/publish-pypi.yml/badge.svg)](https://github.com/cxumol/OCRAgent/actions/workflows/publish-pypi.yml)
 [![PyPI version](https://badge.fury.io/py/ocragent.svg)](https://badge.fury.io/py/ocragent)
 <!-- [![PyPI Downloads](https://img.shields.io/pepy/dt/ocragent)](https://pepy.tech/projects/ocragent) -->
@@ -10,23 +12,14 @@
 
 ![Brand banner](docs/assets/readme-brand-banner.jpg)
 
-> 丝帛简牍数码书，千金半厘辨分殊。  
-> 何须一模破万卷，自能调度在慧枢。 
-
 > OCR-first, agent-guided.
 
 Document parsing should be tiered, routed, and reviewed. Use cheap local extraction when it is enough. Escalate only when the AI agent finds the page needs it.
 
-- Tesseract OCR 搞不定艺术字形和生僻字符; 顶级多模态 LLM 解析出版小说轻轻松松却浪费算力时间, 所以, 你需要分级。 Tesseract OCR can't handle artistic fonts and rare characters; top-tier multimodal LLMs can easily parse published novels but waste computing power and time, so you need a tiered approach. 
-- 同样是多模态大模型, 模型甲更擅长手写识别, 模型乙更胜任公式识别, 所以, 你需要 Agent 帮你分配调度。 Even among multimodal large models, Model A is better at handwriting recognition, while Model B excels at formula recognition, so you need an Agent to handle allocation and scheduling.
-- Agentic Loop 用于文档识别, 好处在于有校对, 即使校对选用了不带视觉功能的 LLM, 也可以从 读着是否通顺､ 排版是否错位､ 表格是否漂移 等方面校对。 The benefit of an Agentic Loop for document recognition is proofreading; even if the proofreading uses an LLM without vision capabilities, it can still check from angles like whether the text reads smoothly or whether the layout is misaligned.
-- 你搭了 12 种 OCR 模型, 要录入 34 份不同品种的档案? 交给 Agent 吧, OCRAgent 帮你搞定｡ You've collected 12 OCR APIs and want to digitize 34 different varieties of documents? Leave it to the AI Agent, OCRAgent will handle it for you.
-
----
-
-## English
-
-English | [简体中文](#简体中文)
+- Tesseract OCR cannot handle every decorative typeface or rare character, while a top multimodal model is wasteful for ordinary printed pages. OCRAgent gives easy pages a cheap first pass.
+- Different multimodal models have different strengths: handwriting, formulas, tables, scans, and layout recovery ask for different tools. OCRAgent routes work through the tool that fits the page.
+- The agent loop adds review. Even a non-vision reviewer can catch rough failures such as broken flow, displaced layout, and drifting tables.
+- If you have several OCR models or document APIs and a mixed archive to process, OCRAgent gives them one command-line workflow.
 
 ## Why OCRAgent
 
@@ -182,11 +175,11 @@ That memory is plain prose. It helps later parser runs choose a sensible startin
 ## Architecture
 
 ```text
-CLI  （ocragent init / run / tool）
- │
-AI Agents  （init_tools / parser / reviewer）
- │
-Tool chain  （builtin tools + user_toolbox.py）
+CLI  (ocragent init / run / tool)
+ |
+AI Agents  (init_tools / parser / reviewer)
+ |
+Tool chain  (builtin tools + user_toolbox.py)
 ```
 
 ![Architecture diagram](docs/assets/readme-architecture.jpg)
@@ -268,248 +261,3 @@ Useful code paths:
 ## Status
 
 OCRAgent is beta. The command shape is usable, and breaking changes are still possible. The project is looking for contributors who care about document extraction, local-first tooling, and agent workflows with clear boundaries.
-
----
-
-## 简体中文
-
-[English](#english) | 简体中文
-
-## 为什么是 OCRAgent
-
-并非 "Yet Another 图文识别工具"，OCRAgent 是用来统筹调度多种图文识别工具的 Agentic Workflow。 把一窝鸡飞狗跳的文档，整理成干净的纯文本。
-
-容易的页，先请便宜的工具去读；读不动了，再请更贵的OCR、VLM或云端API。算力如灯油，明处不必添灯，暗处才该多照一照。
-
-Agent先品尝解析工具和文档的调性，再分派任务。 带上 Agent 的解析不再是一锤子买卖，而是有校对，有打回重做，有请大师傅出山。
-
-![核心价值对比图](docs/assets/readme-core-value-comparison.jpg)
-
-## 快速开始
-
-从 PyPI 安装 OCRAgent，并带上常用文档后端：
-
-```shell
-python -m pip install "ocragent[full]"
-ocragent --help
-```
-
-<details>
-<summary>偏好 uv？</summary>
-
-```shell
-uv tool install "ocragent[full]"
-ocragent --help
-```
-
-</details>
-
-需要 LLM 支持的命令时，配置兼容 OpenAI chat-completions 的端点：
-
-```shell
-export OCRAGENT_CHAT_BASE=http://localhost:8080/v1
-export OCRAGENT_CHAT_MODEL=your-model
-export OCRAGENT_CHAT_AUTHKEY=your-key
-```
-
-也可以使用 `OPENAI_API_KEY`。同样的配置可以写入 `~/.ocragent/ocragent.settings.toml`、`./ocragent.settings.toml` 或 `.env`。配置格式可参考 [src/ocragent/ocragent.settings.default.toml](src/ocragent/ocragent.settings.default.toml)。
-
-查看内建工具：
-
-```shell
-ocragent tool --list
-```
-
-如果要让 OCRAgent 调用你自己的 OCR、VLM、命令行工具或 API，先用普通文本描述它：
-
-```text
-$HOME/ocragent.toolbox_user.txt
-```
-
-用户工具箱的写法可参考 [src/ocragent/ocragent.toolbox_user.example.txt](src/ocragent/ocragent.toolbox_user.example.txt)。各工具说明可以从对应官方文档摘取，再保留工具名、用途范围、成本、参数、限制和调用方式。API key 等机要内容放进环境变量，在工具箱说明中写环境变量名即可。
-
-然后生成工具运行时：
-
-```shell
-ocragent init tools
-```
-
-OCRAgent 会启用 AI Agent 把 ocragent.toolbox_user.txt 转换成的可执行脚本写入 `$HOME/.ocragent/user_toolbox.py`。真实使用前，请先审阅这份文件。
-
-然后解析一个目录：
-
-```shell
-cd /path/to/documents
-ocragent init docs
-ocragent run --out-dir ocragent_results
-```
-
-## CLI 运行示例
-
-```text
-$ ocragent tool --list --scope=parser
-pdf2txt	scope: parser cost: low	Extract PDF text with PyMuPDF.
-	--path /path/to/file.pdf
-
-pdf_pages_to_images	scope: parser cost: medium	Render each PDF page to a PNG image with PyMuPDF.
-	--path /path/to/file.pdf
-	--out-dir /path/to/page-images
-
-pandoc2txt	scope: parser cost: low	Convert office documents to plain text with Pandoc.
-	--path /path/to/file
-
-$ cd ~/cases/mixed_docs
-$ ocragent init tools --from ./ocragent.toolbox_user.txt
-{
-  "ok": true,
-  "usertools_valid": [
-    "siliconflow_deepseekocr"
-  ],
-  "usertools_failed": [],
-  "agent_turns": 1,
-  "result_file": "/home/me/.ocragent/user_toolbox.py"
-}
-
-$ ocragent init docs
-{
-  "ok": true,
-  "result_file": "/home/me/cases/mixed_docs/.ocragent_memory.txt",
-  "groups": [
-    {
-      "name": "pdf_text",
-      "...": "..."
-    }
-  ],
-  "file_count": 18,
-  "unmatched_count": 0
-}
-
-$ ocragent run invoice.pdf scans/ --out-dir ocragent_results
-{
-  "ok": true,
-  "out_dir": "/home/me/cases/mixed_docs/ocragent_results",
-  "parsed_count": 18,
-  "failed_count": 0,
-  "skipped_count": 0,
-  "results": [
-    {
-      "source": "invoice.pdf",
-      "output_file": "/home/me/cases/mixed_docs/ocragent_results/invoice.pdf.txt",
-      "...": "..."
-    }
-  ],
-  "failures": [],
-  "skipped": [],
-  "output_stats": {
-    "file_count": 18,
-    "...": "..."
-  }
-}
-```
-
-上面的 JSON 保留真实字段名，较长的数组用 `"..."` 缩短展示。
-
-## 产出结果
-
-OCRAgent 会在输出目录中保留相对路径：
-
-```text
-docs/report.pdf -> ocragent_results/docs/report.pdf.txt
-scans/page-01.jpg -> ocragent_results/scans/page-01.jpg.md
-```
-
-它还会维护一份目录记忆：
-
-```text
-.ocragent_memory.txt
-```
-
-这份记忆是普通自然语言文本。后续解析会参考它选择合适的起始成本，但项目不会因此被锁进僵硬的数据表结构。
-
-## 三层架构概览
-
-```text
-命令行  （ocragent init / run / tool）
- │
-AI Agents 智能体  （init_tools / parser / reviewer）
- │
-工具链  （builtin tools + user_toolbox.py）
-```
-
-![架构图](docs/assets/readme-architecture.jpg)
-
-| 层次 | 负责 | 例子 |
-| --- | --- | --- |
-| CLI 与命令 | 稳定行为 | 配置、路径、日志、stdout 和 stderr 边界 |
-| 工具层 | 解析能力 | PDF 文本、图像缩略图、Pandoc、用户 OCR、VLM API |
-| Agent 层 | 不确定场景下的判断 | 文件分组、工具选择、抽取结果审阅 |
-
-解析 Agent 先问工具注册表："咱们工具箱里都有啥?" 再选取工具执行。解析得到的候选文本，须经审阅才写入输出目录。审阅不过的，Agent 自会另择工具。
-
-## 配置
-
-配置优先级从高到低：
-
-1. 环境变量。
-2. `./ocragent.settings.toml`。
-3. `~/.ocragent/ocragent.settings.toml`。
-4. 包内默认配置。
-
-常用配置：
-
-```toml
-[aigc.api.chatcomp]
-base = "http://localhost:8080/v1"
-authkey = ""
-model = ""
-model_hasVision = true
-
-[output]
-dir = "ocragent_results"
-ext = "auto"
-parser_summary_batch = 5
-
-[reviewer]
-max_length = 1000
-```
-
-完整默认配置见 [src/ocragent/ocragent.settings.default.toml](src/ocragent/ocragent.settings.default.toml)。
-
-## 参与贡献
-
-OCRAgent 处于 beta 阶段，现在很适合参与塑造。适合下手的贡献包括：
-
-- 增加或改进内建解析工具。
-- 增加能代表真实文档难题的 demo assets。
-- 改进 reviewer prompt 和失败案例。
-- 加强 CLI 行为、工具发现、用户工具生成相关测试。
-- 为常见 OCR、VLM、文档转换后端编写适配器。
-- 把你实际跑通过的流程写进文档。
-
-开始前可先运行：
-
-```shell
-uv run python -m unittest discover -s tests
-uv run --extra pdf python -m unittest discover -s tests
-```
-
-常用代码入口：
-
-- `src/ocragent/cli.py`：命令行入口。
-- `src/ocragent/cmd/`：命令实现。
-- `src/ocragent/cmd/tool.py`：内建和用户工具接口约定。
-- `src/ocragent/agent/`：面向模型的循环。
-- `src/ocragent/config.py`：分层配置。
-- `tests/`：当前测试套件和 CLI 流程检查。
-
-## 文档
-
-- [用户指南](docs/user-guide.zh-hans.md)
-- [架构说明](docs/architecture.md)
-- [Agent 循环](docs/agent-loop.md)
-- [工具机制](docs/tool-mechanism.md)
-- [开发者指南](docs/developer-guide.md)
-
-## 项目状态
-
-OCRAgent 处于 beta 阶段。命令形态已经可用，后续仍可能有破坏性变更。若你也关心文档解析、本地优先工具、边界清楚的 Agentic 工作流，此时加入，正好赶上。
