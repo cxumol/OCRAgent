@@ -2,7 +2,7 @@
 
 OCRAgent is a small Python CLI with agent-assisted edges. Development is easiest when the code keeps the same split as the runtime: deterministic command code owns contracts; agents supply judgment behind those contracts.
 
-The project is about graded parsing. Cheap text extraction, local OCR, remote OCR, VLMs, and multimodal LLMs should not be treated as one interchangeable bucket. Code changes should preserve that routing discipline: inspect cheaply, spend carefully, review before writing.
+The project is about graded parsing: grade, route, parse, and review. Cheap text extraction, local OCR, remote OCR, VLMs, and multimodal LLMs should not be treated as one interchangeable bucket. Code changes should preserve that routing discipline: inspect cheaply, spend carefully, review before writing.
 
 ![OCRAgent system architecture](assets/OCRAgent-System-Architecture-detailed.jpg)
 
@@ -40,6 +40,8 @@ OCRAGENT_CHAT_BASE=http://localhost:8080/v1
 OCRAGENT_CHAT_MODEL=your-model
 OCRAGENT_CHAT_AUTHKEY=your-key
 ```
+
+Prefer a vision-capable model for end-to-end checks that cover scanned PDFs, page images, handwriting, formulas, or layout-heavy files. Text-only models can still exercise tool generation and text review paths, but they cannot inspect rendered pages during grading or review.
 
 ## Code Map
 
@@ -115,7 +117,7 @@ Keep tool contracts narrow. New tools should enter through specs and handlers, n
 
 Use agents where fixed code would encode brittle judgment: interpreting user toolbox prose, grouping heterogeneous document folders, choosing among uncertain parser results, and reviewing extraction quality. Use deterministic code for paths, config, validation, imports, subprocess boundaries, and output writes.
 
-Protect the review loop. Even a text-only model can reject broken extraction by reading the result for fluency, ordering, repeated noise, and layout drift. Changes that bypass review should be treated as behavior changes, not plumbing.
+Protect the review loop. Even a text-only model can reject broken extraction by reading the result for fluency, ordering, repeated noise, and layout drift. A VLM can additionally compare text with page images when they are available. Changes that bypass review should be treated as behavior changes, not plumbing.
 
 When a code change affects behavior, update the relevant document under `docs/` in the same change.
 

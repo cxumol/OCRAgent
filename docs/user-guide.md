@@ -2,7 +2,14 @@
 
 OCRAgent turns a mixed document folder into UTF-8 text. It works best when you initialize the folder once, let it learn cheap signals about the files, then parse through a stable tool set.
 
-The workflow is graded. Embedded PDF text, clean scans, decorative type, handwriting, formulas, and tables do not deserve the same parser or the same bill. OCRAgent starts with the cheapest plausible route, reviews the result, and escalates when the page asks for more.
+The workflow has four steps: grade, route, parse, and review. Embedded PDF text, clean scans, decorative type, handwriting, formulas, and tables do not deserve the same parser or the same bill.
+
+| Step | What happens |
+| --- | --- |
+| Grade | Estimate parsing difficulty from filenames, metadata, previews, and samples. |
+| Route | Pick a parser from builtin tools and user tools by scope, cost, and folder memory. |
+| Parse | Run the selected tool and write UTF-8 text under the output directory. |
+| Review | Check whether extraction is usable; retry with another route when needed. |
 
 ## Install And Configure
 
@@ -23,7 +30,7 @@ ocragent --help
 
 </details>
 
-Configure an OpenAI-compatible chat-completions endpoint for LLM-backed initialization:
+Configure a chat-completions API through environment variables:
 
 ```shell
 export OCRAGENT_CHAT_BASE=http://localhost:8080/v1
@@ -31,7 +38,17 @@ export OCRAGENT_CHAT_MODEL=your-model
 export OCRAGENT_CHAT_AUTHKEY=your-key
 ```
 
-`OPENAI_API_KEY` is also accepted as the auth key. You can put the same values in `~/.ocragent/ocragent.settings.toml` or `./ocragent.settings.toml`. Use [../src/ocragent/ocragent.settings.default.toml](../src/ocragent/ocragent.settings.default.toml) as the configuration reference.
+`OPENAI_API_KEY` is also accepted as the auth key. A vision-capable model is strongly recommended, because OCRAgent uses model judgment during grading and review. You can put the same values in `~/.ocragent/ocragent.settings.toml`, `./ocragent.settings.toml`, or `.env`. Use [../src/ocragent/ocragent.settings.default.toml](../src/ocragent/ocragent.settings.default.toml) as the configuration reference.
+
+<details>
+<summary>Text-only LLM vs multimodal VLM</summary>
+
+| Stage | Text-only LLM | Multimodal VLM |
+| --- | --- | --- |
+| Grade | Uses filenames, metadata, text-layer probes, and OCR samples. It cannot inspect page images directly. | Uses thumbnails or rendered pages to judge scan quality, handwriting, diagrams, tables, layout density, and OCR risk. |
+| Review | Checks text coherence, obvious OCR artifacts, repeated noise, and table damage in text form. | Can compare text against visual evidence when page images are available, which helps with missing regions, layout loss, handwriting, formulas, and image-heavy pages. |
+
+</details>
 
 The `full` extra includes the common local document backends. Minimal installs are possible, but most users should start with `ocragent[full]`.
 
@@ -139,7 +156,7 @@ The full default settings file is [../src/ocragent/ocragent.settings.default.tom
 
 **Do I need a chat model for every command?**
 
-No. Tool listing and many local parsing paths can run without one. `init tools` and `init docs` need a configured model because they ask an agent to synthesize tools or read the shape of a folder.
+No. Tool listing and many local parsing paths can run without one. `init tools` and `init docs` need a configured model because they ask an agent to synthesize tools or read the shape of a folder. A vision-capable model gives better grading and review signals for scanned, handwritten, formula-heavy, or layout-heavy files.
 
 **Why did a PDF become page images?**
 

@@ -2,7 +2,14 @@
 
 OCRAgent turns a mixed document folder into stable text output. Its design is deliberately small: deterministic code owns files, configuration, tool contracts, and validation; agents make the few choices where a folder or extraction result is too varied for fixed rules.
 
-The core design pressure is graded parsing. Tesseract may be enough for plain print and inadequate for decorative type or rare characters. A top multimodal LLM may be excellent for a clean scan and wasteful for a page with an embedded text layer. The architecture exists to route work before spending compute, then review the text before it becomes output.
+The core design pressure is graded parsing. Tesseract may be enough for plain print and inadequate for decorative type or rare characters. A top multimodal LLM may be excellent for a clean scan and wasteful for a page with an embedded text layer. The architecture exists to grade, route, parse, and review before text becomes output.
+
+| Step | Architectural owner | Effect |
+| --- | --- | --- |
+| Grade | `init docs`, previewers, folder memory | Estimate difficulty before spending model or API cost. |
+| Route | parser boundary and tool registry | Pick a parser by scope, cost, availability, and prior memory. |
+| Parse | tool handlers and command modules | Execute extraction through deterministic boundaries. |
+| Review | reviewer agent and repair validator | Accept, repair, or reject extracted text before writing output. |
 
 The system has four layers.
 
@@ -40,7 +47,7 @@ Agents sit above tools, not beside them. They do not own filesystem mutation exc
 There are four current model-facing jobs:
 
 - Generate user tools from a plain-text toolbox description.
-- Group a document folder and write natural-language parser memory.
+- Grade and group a document folder, then write natural-language parser memory.
 - Orchestrate parsing through an agent-shaped boundary while deterministic code ranks first-order candidates.
 - Review extracted text and propose bounded repairs.
 
@@ -48,11 +55,11 @@ The division is intentional. Tool generation is open-ended code synthesis. Folde
 
 ## Parse Lifecycle
 
-A normal run follows this path:
+A normal run follows the same four steps:
 
 1. `ocragent init tools` converts user toolbox prose into a validated runtime module.
-2. `ocragent init docs` scans the working directory, enriches files with cheap previews, groups them by parsing difficulty, and writes folder memory.
-3. `ocragent run` resolves targets, parses them in batches, reviews each result, writes output files, and appends compact run memory.
+2. `ocragent init docs` scans the working directory, enriches files with cheap previews, grades parsing difficulty, and writes folder memory.
+3. `ocragent run` resolves targets, routes each file to parser tools, reviews each result, writes accepted output files, and appends compact run memory.
 
 PDF handling shows the architecture in miniature. The parser first tries cheap text extraction. If review fails and PDF image fallback is available, it renders pages to images, parses those page images, merges the page text, and reviews the merged result. The fallback is bounded to one layer so the system can recover from scanned PDFs without turning a parse run into open-ended planning.
 
@@ -60,7 +67,7 @@ PDF handling shows the architecture in miniature. The parser first tries cheap t
 
 Configuration is layered from package defaults, user TOML, project TOML, `.env`, and environment variables. Environment variables win. Chat settings follow the OpenAI-compatible chat-completions shape: base URL, API key, and model.
 
-The default chat base is local. OCRAgent therefore runs well in a lightweight Linux environment, but LLM-backed initialization requires an explicitly configured model.
+The default chat base is local. OCRAgent therefore runs well in a lightweight Linux environment, but agent-backed grading, routing, and review need an explicitly configured model. A vision-capable model is recommended for scanned pages, handwriting, formulas, tables, and layout-heavy documents because it can inspect rendered pages or thumbnails where a text-only model can only inspect extracted text.
 
 ## Design Pressure
 

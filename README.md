@@ -1,4 +1,4 @@
-<img alt="OCRAgent logo rmbg640" style="float: right;right: 0px" src="docs/assets/readme-logo-rmbg-640.png" width="96" div align=right>
+<img alt="OCRAgent logo" style="float: right;right: 0px" src="docs/assets/readme-logo-rmbg-640.png" width="96" div align=right>
 
 # OCRAgent
 
@@ -14,26 +14,45 @@
 
 > OCR-first, agent-guided.
 
-Document parsing should be tiered, routed, and reviewed. Use cheap local extraction when it is enough. Escalate only when the AI agent finds the page needs it.
+OCRAgent is a command-line document parsing workflow. It uses an agent to select OCR, VLM, PDF, office-document, or user-defined tools, then reviews the extracted text before writing output.
 
-- Tesseract OCR cannot handle every decorative typeface or rare character, while a top multimodal model is wasteful for ordinary printed pages. OCRAgent gives easy pages a cheap first pass.
-- Different multimodal models have different strengths: handwriting, formulas, tables, scans, and layout recovery ask for different tools. OCRAgent routes work through the tool that fits the page.
-- The agent loop adds review. Even a non-vision reviewer can catch rough failures such as broken flow, displaced layout, and drifting tables.
-- If you have several OCR models or document APIs and a mixed archive to process, OCRAgent gives them one command-line workflow.
-
-## Why OCRAgent
+The goal is practical routing: use inexpensive extraction when it is enough, and spend model/API cost only on files that need it.
 
 ![Core value comparison](docs/assets/readme-core-value-comparison.jpg)
 
-Instead of "yet another doc parser", OCRAgent is an Agentic Workflow that orchestrates multiple parsing tools for graded document parsing and judgment-based resource allocation.
+## Grade, Route, Parse, Review
 
-A cheap parser gets the first try when the document looks easy. Costlier OCR, VLMs, and cloud APIs enter when the content needs them.
+OCRAgent works best for mixed folders: PDFs with text layers, scanned PDFs, images, office files, handwritten pages, tables, forms, and other files that should not all use the same parser.
 
-OCRAgent gives its agent enough context to assign work by page character instead of treating every model as interchangeable.
+| Step | What OCRAgent does | Main artifact |
+| --- | --- | --- |
+| Grade | Inspects file names, metadata, preview signals, and sample pages to estimate parsing difficulty. | `.ocragent_memory.txt` |
+| Route | Chooses a parser from builtin tools and user-defined tools according to cost, scope, and prior folder notes. | tool call |
+| Parse | Runs the selected tool and writes UTF-8 text while preserving source-relative paths. | `ocragent_results/` |
+| Review | Checks whether extracted text is usable; retries with another tool or route when review fails. | accepted output or retry |
 
-## First Run
+The four steps keep the system understandable:
 
-Install OCRAgent from PyPI with the common document backends:
+- Grade before spending model/API cost.
+- Route through one tool registry.
+- Parse through deterministic command boundaries.
+- Review before writing final output.
+
+## Runtime Flow
+
+```text
+documents
+  -> init docs
+  -> folder memory
+  -> parser agent
+  -> parser tool
+  -> reviewer agent
+  -> output text
+```
+
+## Install
+
+Install with common document backends:
 
 ```shell
 python -m pip install "ocragent[full]"
@@ -41,7 +60,7 @@ ocragent --help
 ```
 
 <details>
-<summary>Prefer uv?</summary>
+<summary>uv</summary>
 
 ```shell
 uv tool install "ocragent[full]"
@@ -50,7 +69,7 @@ ocragent --help
 
 </details>
 
-For LLM-backed commands, configure an OpenAI-compatible chat-completions endpoint:
+Configure a chat-completions API through environment variables:
 
 ```shell
 export OCRAGENT_CHAT_BASE=http://localhost:8080/v1
@@ -58,31 +77,44 @@ export OCRAGENT_CHAT_MODEL=your-model
 export OCRAGENT_CHAT_AUTHKEY=your-key
 ```
 
-`OPENAI_API_KEY` is also accepted as the auth key. The same values can live in `~/.ocragent/ocragent.settings.toml`, `./ocragent.settings.toml`, or `.env`. Use [src/ocragent/ocragent.settings.default.toml](src/ocragent/ocragent.settings.default.toml) as the configuration reference.
+`OPENAI_API_KEY` is also accepted as the auth key. A vision-capable model is strongly recommended, because OCRAgent uses model judgment during grading and review. The same values can be configured in `~/.ocragent/ocragent.settings.toml`, `./ocragent.settings.toml`, or `.env`. Use [src/ocragent/ocragent.settings.default.toml](src/ocragent/ocragent.settings.default.toml) as the reference.
 
-List builtin tools:
+<details>
+<summary>Text-only LLM vs multimodal VLM</summary>
+
+| Stage | Text-only LLM | Multimodal VLM |
+| --- | --- | --- |
+| Grade | Uses file names, metadata, text-layer probes, and OCR samples. It can estimate readability from extracted text, but cannot inspect page images directly. | Uses thumbnails or rendered pages to judge scan quality, handwriting, diagrams, tables, layout density, and whether OCR is likely to fail. |
+| Review | Checks whether extracted text reads coherently, whether tables look damaged in text form, and whether obvious OCR artifacts appear. | Can compare extracted text against visual page evidence when available, which is better for missing regions, layout loss, handwriting, formulas, and image-heavy pages. |
+
+</details>
+
+## Quick Start
+
+List available tools:
 
 ```shell
 ocragent tool --list
+ocragent tool --list --scope=parser
 ```
 
-If you want OCRAgent to call your own OCR, VLM, shell command, or API, describe it in plain text first:
+Generate user tools if you want OCRAgent to call your own OCR, VLM, shell command, or API. Describe tools in plain text:
 
 ```text
 $HOME/ocragent.toolbox_user.txt
 ```
 
-The toolbox description format can follow [src/ocragent/ocragent.toolbox_user.example.txt](src/ocragent/ocragent.toolbox_user.example.txt). Tool descriptions can be copied from the vendor's official docs, trimmed to name, scope, cost, flags, limits, and call shape. Put secrets such as API keys in environment variables, then name those variables in the toolbox prose.
+The format can follow [src/ocragent/ocragent.toolbox_user.example.txt](src/ocragent/ocragent.toolbox_user.example.txt). Include tool name, scope, cost, flags, limits, call shape, and required environment variables.
 
-Then generate the tool runtime:
+Generate the runtime:
 
 ```shell
 ocragent init tools
 ```
 
-OCRAgent writes executable Python to `$HOME/.ocragent/user_toolbox.py`. Review that file before using it with real credentials.
+OCRAgent writes executable Python to `$HOME/.ocragent/user_toolbox.py`. Review this file before running it with credentials.
 
-Then parse a folder:
+Initialize and parse a document folder:
 
 ```shell
 cd /path/to/documents
@@ -106,71 +138,36 @@ pandoc2txt	scope: parser cost: low	Convert office documents to plain text with P
 
 $ cd ~/cases/mixed_docs
 $ ocragent init tools --from ./ocragent.toolbox_user.txt
-{
-  "ok": true,
-  "usertools_valid": [
-    "siliconflow_deepseekocr"
-  ],
-  "usertools_failed": [],
-  "agent_turns": 1,
-  "result_file": "/home/me/.ocragent/user_toolbox.py"
-}
+# writes /home/me/.ocragent/user_toolbox.py
+# reports valid and failed user tools
 
 $ ocragent init docs
-{
-  "ok": true,
-  "result_file": "/home/me/cases/mixed_docs/.ocragent_memory.txt",
-  "groups": [
-    {
-      "name": "pdf_text",
-      "...": "..."
-    }
-  ],
-  "file_count": 18,
-  "unmatched_count": 0
-}
+# writes .ocragent_memory.txt
+# reports detected groups, file_count, and unmatched_count
 
 $ ocragent run invoice.pdf scans/ --out-dir ocragent_results
-{
-  "ok": true,
-  "out_dir": "/home/me/cases/mixed_docs/ocragent_results",
-  "parsed_count": 18,
-  "failed_count": 0,
-  "skipped_count": 0,
-  "results": [
-    {
-      "source": "invoice.pdf",
-      "output_file": "/home/me/cases/mixed_docs/ocragent_results/invoice.pdf.txt",
-      "...": "..."
-    }
-  ],
-  "failures": [],
-  "skipped": [],
-  "output_stats": {
-    "file_count": 18,
-    "...": "..."
-  }
-}
+# writes parsed files under ocragent_results/
+# reports parsed_count, failed_count, skipped_count, and output_stats
 ```
 
-The JSON examples above keep the real field names and shorten long arrays with `"..."`.
+The commands return JSON in normal use. The example above keeps the flow compact and notes the important fields.
 
-## What You Get
+## Output
 
-OCRAgent preserves relative paths in the output directory:
+OCRAgent preserves relative paths:
 
 ```text
 docs/report.pdf -> ocragent_results/docs/report.pdf.txt
 scans/page-01.jpg -> ocragent_results/scans/page-01.jpg.md
 ```
 
-It also maintains a folder memory file:
+It also writes a folder memory file:
 
 ```text
 .ocragent_memory.txt
 ```
 
-That memory is plain prose. It helps later parser runs choose a sensible starting cost without forcing the project into a rigid database schema.
+The memory file is prose. It records file groups, difficulty estimates, tool choices, and run summaries. Later parser runs use it as context.
 
 ## Architecture
 
@@ -184,15 +181,13 @@ Tool chain  (builtin tools + user_toolbox.py)
 
 ![Architecture diagram](docs/assets/readme-architecture.jpg)
 
-OCRAgent has three working planes:
-
-| Plane | Owns | Examples |
+| Plane | Responsibility | Examples |
 | --- | --- | --- |
-| CLI and commands | Stable behavior | config, paths, logging, stdout and stderr contracts |
-| Tool plane | Extraction capability | PDF text, image thumbnails, Pandoc, user OCR, VLM APIs |
-| Agent plane | Judgment under uncertainty | grouping files, choosing tools, reviewing extracted text |
+| CLI and commands | Stable command behavior | config, paths, logging, stdout, stderr |
+| Tool registry | Parser capability boundary | PDF text, image thumbnails, Pandoc, user OCR, VLM APIs |
+| Agent loops | Runtime decisions | file grouping, tool selection, review, retry |
 
-The parser never calls vendors directly. It asks the tool registry what is available, runs a parser through the same boundary as the CLI, and sends candidate text to review before writing output. When the review fails, the agent can retry with another tool or a higher-cost route, guided by folder memory and the last failure.
+The parser agent does not call vendor APIs directly. It reads the available parser tools, chooses one, runs it through the tool boundary, and sends extracted text to the reviewer. If review fails, the parser can retry with another tool or a higher-cost route.
 
 ## Configuration
 
@@ -221,34 +216,7 @@ parser_summary_batch = 5
 max_length = 1000
 ```
 
-The complete default shape is in [src/ocragent/ocragent.settings.default.toml](src/ocragent/ocragent.settings.default.toml).
-
-## Contributing
-
-OCRAgent is beta, which makes it a good time to shape the core. Useful contributions are small and concrete:
-
-- Add or improve builtin parser tools.
-- Add demo assets that represent real document pain.
-- Improve reviewer prompts and failure cases.
-- Strengthen tests around CLI behavior, tool discovery, and generated user tools.
-- Write adapters for common OCR, VLM, and document conversion backends.
-- Improve docs for a workflow you actually tried.
-
-Start with:
-
-```shell
-uv run python -m unittest discover -s tests
-uv run --extra pdf python -m unittest discover -s tests
-```
-
-Useful code paths:
-
-- `src/ocragent/cli.py`: command boundary.
-- `src/ocragent/cmd/`: command implementations.
-- `src/ocragent/cmd/tool.py`: builtin and user tool contract.
-- `src/ocragent/agent/`: model-facing loops.
-- `src/ocragent/config.py`: layered settings.
-- `tests/`: current test suite and CLI flow checks.
+The complete default file is [src/ocragent/ocragent.settings.default.toml](src/ocragent/ocragent.settings.default.toml).
 
 ## Documentation
 
@@ -258,6 +226,31 @@ Useful code paths:
 - [Tool Mechanism](docs/tool-mechanism.md)
 - [Developer Guide](docs/developer-guide.md)
 
-## Status
+## Contributing
 
-OCRAgent is beta. The command shape is usable, and breaking changes are still possible. The project is looking for contributors who care about document extraction, local-first tooling, and agent workflows with clear boundaries.
+OCRAgent is beta. Breaking changes are still possible.
+
+Useful contributions:
+
+- Add or improve builtin parser tools.
+- Add demo assets for real document cases.
+- Improve reviewer prompts and failure cases.
+- Strengthen tests around CLI behavior, tool discovery, and generated user tools.
+- Write adapters for common OCR, VLM, and document conversion backends.
+- Improve documentation for tested workflows.
+
+Run tests:
+
+```shell
+uv run python -m unittest discover -s tests
+uv run --extra pdf python -m unittest discover -s tests
+```
+
+Important paths:
+
+- `src/ocragent/cli.py`: command boundary.
+- `src/ocragent/cmd/`: command implementations.
+- `src/ocragent/cmd/tool.py`: builtin and user tool contract.
+- `src/ocragent/agent/`: model-facing loops.
+- `src/ocragent/config.py`: layered settings.
+- `tests/`: test suite and CLI flow checks.

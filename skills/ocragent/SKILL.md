@@ -5,7 +5,7 @@ description: Use OCRAgent for cost-aware document parsing and OCR orchestration.
 
 # OCRAgent
 
-Use OCRAgent when the task is to turn document files into UTF-8 text or Markdown while choosing a sensible parser cost for each file. This skill is portable: callers should only rely on `SKILL.md`, optional `references/`, and ordinary shell commands.
+Use OCRAgent when the task is to turn document files into UTF-8 text or Markdown while choosing a sensible parser cost for each file. The core workflow is grade, route, parse, and review. This skill is portable: callers should only rely on `SKILL.md`, optional `references/`, and ordinary shell commands.
 
 ## Quick Reference
 
@@ -56,13 +56,15 @@ python -m pip install ocragent
 ocragent tool --list
 ```
 
-2. Configure chat before agent-backed commands:
+2. Configure a chat-completions API before agent-backed commands:
 
 ```shell
 export OCRAGENT_CHAT_BASE=http://localhost:8080/v1
 export OCRAGENT_CHAT_MODEL=your-model
 export OCRAGENT_CHAT_AUTHKEY=your-key
 ```
+
+Prefer a vision-capable model. OCRAgent uses model judgment during grading and review; VLMs can inspect thumbnails or rendered pages, while text-only LLMs can only inspect filenames, metadata, extracted text, and OCR samples. See `references/toolbox-and-config.md` for details.
 
 3. Confirm parser tools:
 
@@ -100,6 +102,15 @@ ocragent run invoice.pdf scans/ --out-dir ocragent_results
 
 Read the JSON summary from stdout. Check `ocragent.log` in the working directory when a command fails.
 
+## Processing Model
+
+| Step | What OCRAgent does |
+| --- | --- |
+| Grade | Estimate parsing difficulty from filenames, metadata, previews, and samples. |
+| Route | Pick a parser from builtin tools and user tools by scope, cost, and folder memory. |
+| Parse | Run the selected tool and write UTF-8 text or Markdown under the output directory. |
+| Review | Check whether extraction is usable; retry with another route when needed. |
+
 ## Output Contract
 
 Successful parsing writes UTF-8 text or Markdown files under the chosen output directory. OCRAgent preserves source-relative paths, for example:
@@ -115,7 +126,7 @@ The CLI prints machine-readable JSON summaries to stdout. Report the important f
 
 - Python 3.11 or newer.
 - `ocragent[full]` for common PDF and office-document backends.
-- An OpenAI-compatible chat-completions endpoint for `init tools`, `init docs`, and agent-driven parsing review.
+- A chat-completions endpoint for `init tools`, `init docs`, and agent-driven parsing review; a vision-capable model is strongly recommended for scanned, handwritten, formula-heavy, table-heavy, or layout-heavy files.
 - Optional external OCR, VLM, or API credentials declared in the toolbox prose and provided through environment variables.
 - Network access only when selected tools or chat endpoints require it.
 - A virtual environment is recommended when system Python is externally managed or not writable.

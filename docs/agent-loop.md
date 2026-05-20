@@ -2,7 +2,7 @@
 
 OCRAgent uses agents where the input space is too open for durable rules and where a deterministic validator can still close the loop. The agent may propose; code decides whether the proposal becomes state.
 
-The loop exists because document parsing needs more than a first pass. A cheap extractor may be enough. A page image may need OCR. A handwritten note, a formula sheet, and a table scan may each call for a different model. After extraction, even a text-only reviewer can catch prose that no longer reads, headings that repeat, tables that drift, and paragraphs that disappear.
+The loop exists because document parsing needs four decisions: grade, route, parse, and review. A cheap extractor may be enough. A page image may need OCR. A handwritten note, a formula sheet, and a table scan may each call for a different model. After extraction, even a text-only reviewer can catch prose that no longer reads, headings that repeat, tables that drift, and paragraphs that disappear.
 
 ## Responsibility Split
 
@@ -10,7 +10,7 @@ The system has four model-facing responsibilities.
 
 `init_tools` turns user-authored toolbox prose into a Python runtime module. This is agent work because the source may describe local commands, HTTP APIs, credentials, and quirks in many styles. A rules engine would either reject useful prose or grow into a weak code generator.
 
-`init docs` groups a local folder and writes `.ocragent_memory.txt`. This is model work because filenames, preview metadata, and parsing difficulty are weak signals. The output is prose so later code can treat it as guidance.
+`init docs` grades and groups a local folder, then writes `.ocragent_memory.txt`. This is model work because filenames, preview metadata, and parsing difficulty are weak signals. With a vision-capable model, thumbnail and rendered-page signals can also inform the grade. The output is prose so later code can treat it as guidance.
 
 `parser` is an agent-shaped controller around deterministic tool execution. Today the first-order candidate ranking is deterministic: availability, scope, flags, extension fit, and cost baseline decide the order. The agent boundary is still useful because real documents are uneven and later policy can use the same tool-call contract without changing filesystem ownership.
 
@@ -104,6 +104,8 @@ The reviewer returns one normalized status:
 Empty text is always `major_revision`. Without a configured model, non-empty text passes locally. With a model, only a bounded prefix is sent for audit; accepted output still uses the complete original text unless a valid repair is applied.
 
 The reviewer does not need vision to be useful. It judges the text it receives: fluency, obvious omissions, repeated boilerplate, broken ordering, and layout damage. That review signal is enough to make the parser try a better route.
+
+A vision-capable reviewer can use page images when available. That improves review for missing regions, handwriting, formulas, image-heavy pages, and layout loss. Text-only review remains valuable, but it cannot compare extracted text with the visual page.
 
 The reviewer exposes one repair tool: `myregexpatch`. It accepts `before_len`, `after_len`, and a chain of `re.sub` patches. The program applies the chain to the initial full parser text and returns only an audit summary: status, patch count, replacement count, and lengths.
 

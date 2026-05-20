@@ -2,7 +2,14 @@
 
 OCRAgent 把一个目录里的杂文档，理成可读、可检索、可再处理的 UTF-8 文本。推荐走法很清楚：先准备工具，再让它看一遍目录，最后开始解析。
 
-它不急着把每一页都交给最贵的模型。普通文字层、清爽扫描页、手写稿、公式、表格，各有各的读法；先用便宜办法探路，读不动处再添算力。
+工作流分为四步：分级、分配、解析、复查。普通文字层、清爽扫描页、手写稿、公式、表格，各有各的读法。
+
+| 步骤 | 做什么 |
+| --- | --- |
+| 分级 | 根据文件名、元数据、预览和抽样估计解析难度。 |
+| 分配 | 根据 scope、成本和目录记忆，从内建工具和用户工具中选择解析器。 |
+| 解析 | 执行选中的工具，并在输出目录写入 UTF-8 文本。 |
+| 复查 | 判断抽取结果是否可用；必要时换路线重试。 |
 
 ## 安装与配置
 
@@ -23,7 +30,7 @@ ocragent --help
 
 </details>
 
-需要 LLM 帮忙做初始化时，配置一个兼容 OpenAI chat-completions 的端点：
+建议通过环境变量配置 chat-completions API：
 
 ```shell
 export OCRAGENT_CHAT_BASE=http://localhost:8080/v1
@@ -31,7 +38,17 @@ export OCRAGENT_CHAT_MODEL=your-model
 export OCRAGENT_CHAT_AUTHKEY=your-key
 ```
 
-也可以使用 `OPENAI_API_KEY`，或把同样的配置写入 `~/.ocragent/ocragent.settings.toml`、`./ocragent.settings.toml`。配置格式可参考 [../src/ocragent/ocragent.settings.default.toml](../src/ocragent/ocragent.settings.default.toml)。
+也可以使用 `OPENAI_API_KEY` 作为 auth key。强烈建议配置具备视觉模态的模型，因为 OCRAgent 会在分级和复查阶段使用模型判断。同样的配置可以写入 `~/.ocragent/ocragent.settings.toml`、`./ocragent.settings.toml` 或 `.env`。配置格式参考 [../src/ocragent/ocragent.settings.default.toml](../src/ocragent/ocragent.settings.default.toml)。
+
+<details>
+<summary>纯文字 LLM 与多模态 VLM 的区别</summary>
+
+| 阶段 | 纯文字 LLM | 多模态 VLM |
+| --- | --- | --- |
+| 分级 | 依赖文件名、元数据、文字层探测和 OCR 抽样结果，不能直接查看页面图像。 | 可根据缩略图或页面渲染图判断扫描质量、手写、图表、表格、版面密度和 OCR 风险。 |
+| 复查 | 检查文本连贯性、明显 OCR 噪声、重复内容和表格文本损坏。 | 有页面图像时，可对照视觉证据检查漏识别区域、版面丢失、手写、公式和图片密集页面。 |
+
+</details>
 
 `full` 会带上常用本地文档后端。若只想装最小依赖，也可以另行选择；多数用户从 `ocragent[full]` 开始最省心。
 
@@ -139,7 +156,7 @@ max_length = 1000
 
 **每个命令都需要模型吗？**
 
-不需要。查看工具和不少本地解析路径，都可以不用模型。`init tools` 和 `init docs` 需要模型，因为它们要让 Agent 生成工具代码，或判断目录里那些文件大概该怎样分组。
+不需要。查看工具和不少本地解析路径，都可以不用模型。`init tools` 和 `init docs` 需要模型，因为它们要让 Agent 生成工具代码，或判断目录里那些文件大概该怎样分组。具备视觉模态的模型能为扫描件、手写稿、公式和复杂版面提供更好的分级与复查信号。
 
 **为什么 PDF 会被转成逐页图片？**
 

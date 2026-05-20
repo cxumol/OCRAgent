@@ -25,7 +25,7 @@ ocragent tool --list
 
 ## Chat Endpoint
 
-LLM-backed commands need an OpenAI-compatible chat-completions endpoint:
+Configure a chat-completions API through environment variables:
 
 ```shell
 export OCRAGENT_CHAT_BASE=http://localhost:8080/v1
@@ -33,7 +33,26 @@ export OCRAGENT_CHAT_MODEL=your-model
 export OCRAGENT_CHAT_AUTHKEY=your-key
 ```
 
-`OPENAI_API_KEY` is also accepted as the auth key. The same values can live in `./ocragent.settings.toml`, `~/.ocragent/ocragent.settings.toml`, or `.env`.
+`OPENAI_API_KEY` is also accepted as the auth key. A vision-capable model is strongly recommended, because OCRAgent uses model judgment during grading and review. The same values can live in `./ocragent.settings.toml`, `~/.ocragent/ocragent.settings.toml`, or `.env`.
+
+<details>
+<summary>Text-only LLM vs multimodal VLM</summary>
+
+| Stage | Text-only LLM | Multimodal VLM |
+| --- | --- | --- |
+| Grade | Uses filenames, metadata, text-layer probes, and OCR samples. It cannot inspect page images directly. | Uses thumbnails or rendered pages to judge scan quality, handwriting, diagrams, tables, layout density, and OCR risk. |
+| Review | Checks text coherence, obvious OCR artifacts, repeated noise, and table damage in text form. | Can compare text against visual evidence when page images are available, which helps with missing regions, layout loss, handwriting, formulas, and image-heavy pages. |
+
+</details>
+
+## Grade, Route, Parse, Review
+
+| Step | What happens | Common artifact |
+| --- | --- | --- |
+| Grade | Estimate parsing difficulty from filenames, metadata, previews, and samples. | `.ocragent_memory.txt` |
+| Route | Pick a parser from builtin tools and user tools by scope, cost, and folder memory. | tool call |
+| Parse | Run the selected parser and write UTF-8 text or Markdown. | `ocragent_results/` |
+| Review | Check whether extraction is usable; retry with another route when needed. | accepted output or retry |
 
 ## User Toolbox
 
