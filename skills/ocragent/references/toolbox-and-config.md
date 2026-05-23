@@ -45,6 +45,39 @@ export OCRAGENT_CHAT_AUTHKEY=your-key
 
 </details>
 
+## Caller Resource Handoff
+
+When an upper-level Agent invokes this skill, it may prepare OCRAgent with resources already available in its own task context after user authorization. Suitable handoffs include:
+
+- chat endpoint base URL and model name;
+- API keys or tokens needed by chat endpoints or external parser tools;
+- local service URLs, executable paths, or workspace paths;
+- user-approved prose describing OCR, VLM, shell-command, or API parser tools;
+- a writable workspace-local `HOME`.
+
+Secrets must not be passed as argv. Prefer exported environment variables for the current command session or a user-approved `.env` file. Non-secret stable settings may go into `ocragent.settings.toml`. Tool descriptions belong in `${HOME}/ocragent.toolbox_user.txt`; generated executable code belongs in `${HOME}/.ocragent/user_toolbox.py` and should be reviewed before it runs with real credentials.
+
+Example command-session handoff:
+
+```shell
+export OCRAGENT_CHAT_BASE=http://localhost:8080/v1
+export OCRAGENT_CHAT_MODEL=your-model
+export OCRAGENT_CHAT_AUTHKEY="$USER_APPROVED_KEY"
+HOME=/path/to/workspace-home ocragent --dry-run
+HOME=/path/to/workspace-home ocragent --out-dir ocragent_results
+```
+
+Example toolbox handoff:
+
+```shell
+mkdir -p "$HOME"
+# Write only user-approved tool facts into this file.
+$EDITOR "$HOME/ocragent.toolbox_user.txt"
+ocragent init tools --from "$HOME/ocragent.toolbox_user.txt"
+```
+
+If the caller lacks authorization to expose a credential or write a config file, stop and ask the user for that specific permission or input.
+
 ## Grade, Route, Parse, Review
 
 | Step | What happens | Common artifact |
@@ -53,6 +86,19 @@ export OCRAGENT_CHAT_AUTHKEY=your-key
 | Route | Pick a parser from builtin tools and user tools by scope, cost, and folder memory. | tool call |
 | Parse | Run the selected parser and write UTF-8 text or Markdown. | `ocragent_results/` |
 | Review | Check whether extraction is usable; retry with another route when needed. | accepted output or retry |
+
+## Guided Run
+
+For ordinary parse requests, preview and run Autonomous Mode from the document folder:
+
+```shell
+cd /path/to/documents
+ocragent --dry-run
+ocragent --out-dir ocragent_results
+ocragent invoice.pdf scans/ --out-dir ocragent_results
+```
+
+Autonomous Mode reuses existing generated files, creates a builtin-only runtime when no toolbox prose is present, runs `init tools` when toolbox prose exists, runs `init docs` when folder memory is missing, and then parses. If generated user tools need review, inspect `${HOME}/.ocragent/user_toolbox.py` before rerunning with `--yes`.
 
 ## User Toolbox
 
@@ -95,12 +141,19 @@ OCRAgent writes `${HOME}/.ocragent/user_toolbox.py`. Treat it as executable gene
 If the runtime cannot read or write the real home directory, use a writable workspace directory:
 
 ```shell
+HOME=/path/to/workspace-home ocragent --dry-run
+HOME=/path/to/workspace-home ocragent --out-dir ocragent_results
+```
+
+Keep the same `HOME` across guided or manual commands, otherwise OCRAgent will look for a different `user_toolbox.py`.
+
+Use manual stages when a specific step must be controlled:
+
+```shell
 HOME=/path/to/workspace-home ocragent init tools --from ./ocragent.toolbox_user.txt
 HOME=/path/to/workspace-home ocragent init docs
 HOME=/path/to/workspace-home ocragent run --out-dir ocragent_results
 ```
-
-Keep the same `HOME` across `init tools`, `init docs`, and `run`, otherwise OCRAgent will look for a different `user_toolbox.py`.
 
 ## Generated Files
 
